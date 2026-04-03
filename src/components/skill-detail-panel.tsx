@@ -24,6 +24,61 @@ interface SkillDetailPanelProps {
 }
 
 // ---------------------------------------------------------------------------
+// Badge info helper (exported for testing)
+// ---------------------------------------------------------------------------
+
+const TYPE_CLASSES: Record<SkillFile["type"], string> = {
+  skill:
+    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  agent:
+    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  rule: "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+};
+
+const LEVEL_CLASSES: Record<SkillFile["level"], string> = {
+  user: "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  project:
+    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  plugin:
+    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+};
+
+const CONTEXT_CLASS =
+  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border border-border";
+
+export interface HeaderBadgeInfo {
+  typeLabel: SkillFile["type"];
+  typeClass: string;
+  levelLabel: SkillFile["level"];
+  levelClass: string;
+  /** Project name, plugin name, or null for user-level skills. */
+  contextLabel: string | null;
+  contextClass: string;
+}
+
+/**
+ * Derives the badge labels and CSS classes for the detail panel header.
+ * Pure function — no side effects — exported for unit testing.
+ */
+export function getHeaderBadgeInfo(skill: SkillFile): HeaderBadgeInfo {
+  let contextLabel: string | null = null;
+  if (skill.level === "project" && skill.projectName) {
+    contextLabel = skill.projectName;
+  } else if (skill.level === "plugin" && skill.pluginName) {
+    contextLabel = skill.pluginName;
+  }
+
+  return {
+    typeLabel: skill.type,
+    typeClass: TYPE_CLASSES[skill.type],
+    levelLabel: skill.level,
+    levelClass: LEVEL_CLASSES[skill.level],
+    contextLabel,
+    contextClass: CONTEXT_CLASS,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Frontmatter display — renders key-value pairs
 // ---------------------------------------------------------------------------
 
@@ -191,6 +246,23 @@ export function SkillDetailPanel({ skill, onClose }: SkillDetailPanelProps) {
               <SheetTitle className="text-base font-semibold">
                 {skill.name}
               </SheetTitle>
+
+              {/* Badge row — type, level, and context (project/plugin name) */}
+              {(() => {
+                const badges = getHeaderBadgeInfo(skill);
+                return (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className={badges.typeClass}>{badges.typeLabel}</span>
+                    <span className={badges.levelClass}>{badges.levelLabel}</span>
+                    {badges.contextLabel && (
+                      <span className={badges.contextClass}>
+                        {badges.contextLabel}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+
               {skill.description && (
                 <SheetDescription>{skill.description}</SheetDescription>
               )}
