@@ -18,10 +18,14 @@ import { NextResponse } from 'next/server';
 import { discoverProjects } from '@/lib/scanner/discover';
 import { scanAll } from '@/lib/scanner/scan';
 import { buildOverlapClusters } from '@/lib/analyzer/overlaps';
-import type { ScanResult, OverlapCluster, SkillFile } from '@/lib/types';
+import { buildGapFlags } from '@/lib/analyzer/gaps';
+import { buildContradictionFlags } from '@/lib/analyzer/contradictions';
+import type { ScanResult, OverlapCluster, SkillFile, GapFlag, ContradictionFlag } from '@/lib/types';
 
 export interface AnalyzeResponse extends ScanResult {
   clusters: OverlapCluster[];
+  gaps: GapFlag[];
+  contradictions: ContradictionFlag[];
   scanDurationMs: number;
 }
 
@@ -63,11 +67,17 @@ export async function GET(
       return b.files.length - a.files.length;
     });
 
+    // Gap and contradiction analysis
+    const gaps = buildGapFlags(allFiles, result.projects);
+    const contradictions = buildContradictionFlags(allFiles);
+
     const scanDurationMs = Date.now() - startMs;
 
     return NextResponse.json<AnalyzeResponse>({
       ...result,
       clusters,
+      gaps,
+      contradictions,
       scanDurationMs,
     });
   } catch (err) {
