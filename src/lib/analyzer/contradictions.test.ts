@@ -2,7 +2,9 @@
  * Unit tests for buildContradictionFlags()
  *
  * AC1: "Detects mismatches across all compared fields"
- *   → unit (pure logic — groups by filename, compares frontmatter values)
+ *   → unit (pure logic — groups by skill identity, compares frontmatter values)
+ * AC1b: "skillName uses skill identity (parentDir/filename), not just basename"
+ *   → unit (ensures SKILL.md files from different parent dirs don't merge)
  * AC2: "Only flags fields where values actually differ (not just missing vs present)"
  *   → unit (presence-only entries must NOT produce a flag)
  * AC3: "Severity levels assigned correctly"
@@ -120,7 +122,8 @@ describe('buildContradictionFlags — model field (AC1 + AC3)', () => {
     const flags = buildContradictionFlags(files);
 
     expect(flags).toHaveLength(1);
-    expect(flags[0].skillName).toBe('SKILL.md');
+    // skillName is now the skill identity key (parentDir/filename)
+    expect(flags[0].skillName).toBe('save/SKILL.md');
     expect(flags[0].field).toBe('model');
     expect(flags[0].severity).toBe('warning');
     expect(flags[0].values).toHaveLength(2);
@@ -355,7 +358,8 @@ describe('buildContradictionFlags — multiple clusters', () => {
 
     expect(flags).toHaveLength(2);
     const skillNames = flags.map((f) => f.skillName).sort();
-    expect(skillNames).toEqual(['SKILL.md', 'deploy.md']);
+    // skillName is now identity key (parentDir/filename)
+    expect(skillNames).toEqual(['rules/deploy.md', 'save/SKILL.md']);
   });
 });
 
@@ -475,5 +479,99 @@ describe('buildContradictionFlags — edge cases', () => {
     expect(flags).toHaveLength(1);
     expect(flags[0].field).toBe('model');
     expect(flags[0].values).toHaveLength(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC1b: Identity-based grouping (parentDir/filename) prevents false clusters
+// ---------------------------------------------------------------------------
+
+describe('buildContradictionFlags — skill identity grouping (AC1b)', () => {
+  it('does NOT merge SKILL.md files from different parent directories into one cluster', () => {
+    const files = [
+      // "save" skill in two projects — model mismatch
+      makeSkillFile(
+        '/p1/.claude/skills/save/SKILL.md',
+        { model: 'sonnet' },
+        { projectName: 'p1', level: 'project' }
+      ),
+      makeSkillFile(
+        '/p2/.claude/skills/save/SKILL.md',
+        { model: 'opus' },
+        { projectName: 'p2', level: 'project' }
+      ),
+      // "deploy" skill in two projects — same model (no contradiction)
+      makeSkillFile(
+        '/p1/.claude/skills/deploy/SKILL.md',
+        { model: 'haiku' },
+        { projectName: 'p1', level: 'project' }
+      ),
+      makeSkillFile(
+        '/p2/.claude/skills/deploy/SKILL.md',
+        { model: 'haiku' },
+        { projectName: 'p2', level: 'project' }
+      ),
+    ];
+
+    const flags = buildContradictionFlags(files);
+
+    // Only the "save" identity should produce a flag (deploy has identical model)
+    expect(flags).toHaveLength(1);
+    expect(flags[0].skillName).toBe('save/SKILL.md');
+  });
+
+  it('produces separate flags for SKILL.md files from different skill identities when both have mismatches', () => {
+    const files = [
+      // "commit" skill — effort mismatch
+      makeSkillFile(
+        '/p1/.claude/skills/commit/SKILL.md',
+        { effort: 'low' },
+        { projectName: 'p1', level: 'project' }
+      ),
+      makeSkillFile(
+        '/p2/.claude/skills/commit/SKILL.md',
+        { effort: 'high' },
+        { projectName: 'p2', level: 'project' }
+      ),
+      // "review" skill — model mismatch
+      makeSkillFile(
+        '/p1/.claude/skills/review/SKILL.md',
+        { model: 'sonnet' },
+        { projectName: 'p1', level: 'project' }
+      ),
+      makeSkillFile(
+        '/p2/.claude/skills/review/SKILL.md',
+        { model: 'opus' },
+        { projectName: 'p2', level: 'project' }
+      ),
+    ];
+
+    const flags = buildContradictionFlags(files);
+
+    // Two distinct skill identities → two flags
+    expect(flags).toHaveLength(2);
+    const identities = flags.map((f) => f.skillName).sort();
+    expect(identities).toEqual(['commit/SKILL.md', 'review/SKILL.md']);
+  });
+
+  it('skillName field contains the full identity key, not just the basename', () => {
+    const files = [
+      makeSkillFile(
+        '/p1/.claude/agents/code-review/SKILL.md',
+        { model: 'haiku' },
+        { projectName: 'p1', level: 'project' }
+      ),
+      makeSkillFile(
+        '/p2/.claude/agents/code-review/SKILL.md',
+        { model: 'opus' },
+        { projectName: 'p2', level: 'project' }
+      ),
+    ];
+
+    const flags = buildContradictionFlags(files);
+    expect(flags).toHaveLength(1);
+    // Must be "code-review/SKILL.md", NOT just "SKILL.md"
+    expect(flags[0].skillName).toBe('code-review/SKILL.md');
+    expect(flags[0].skillName).not.toBe('SKILL.md');
   });
 });

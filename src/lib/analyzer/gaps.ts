@@ -3,16 +3,40 @@
  *
  * This module is pure (no I/O). It accepts a flat array of SkillFile objects and
  * a list of all known Projects, then returns GapFlag objects for skills that are
- * "common enough" (present in >= 50% of projects) but not universally deployed.
+ * "common enough" but not universally deployed.
  *
  * Rules:
  * - User-level skills (level === 'user') are excluded — they're available everywhere.
- * - Only filenames that appear in at least 50% of the total project count are flagged.
+ * - The coverage threshold is adaptive:
+ *   - For small project counts (< 4 projects): a skill must appear in at least 2 projects.
+ *   - For larger counts: a skill must appear in >= 50% of projects.
+ *   This prevents the threshold from blocking all results with small project sets.
  * - A gap is only reported when at least one project is missing the skill.
  */
 
 import * as path from 'path';
 import type { SkillFile, Project, GapFlag } from '@/lib/types';
+
+/**
+ * Compute the minimum number of projects a skill must appear in to be flagged as a gap.
+ *
+ * The threshold is adaptive:
+ * - For small project counts (< 4): require at least 2 projects (absolute minimum).
+ * - For larger counts: require >= 50% coverage (relative threshold).
+ *
+ * Examples:
+ *   2 projects → min 2 (100% — only flags if present in all but 1 is impossible since 2/2=100%, so
+ *                       the 50% threshold = 1, but we clamp to 2 so we never flag with 1 copy)
+ *   3 projects → min 2 (67% → 2 of 3)
+ *   4 projects → min 2 (50% = 2 of 4)
+ *   6 projects → min 3 (50% = 3 of 6)
+ *
+ * @internal Exported for testing.
+ */
+export function computeGapThreshold(totalProjects: number): number {
+  const halfFloor = Math.ceil(totalProjects * 0.5);
+  return Math.max(2, halfFloor);
+}
 
 /**
  * Analyze a flat list of SkillFiles and a list of all known Projects, returning
@@ -23,8 +47,8 @@ import type { SkillFile, Project, GapFlag } from '@/lib/types';
  * 2. Group remaining files by filename (basename).
  * 3. For each filename group, collect the set of project names that HAVE it
  *    (only from files with a non-null projectName).
- * 4. Compute coverage = projectsWithSkill.size / totalProjects.
- * 5. Skip if coverage < 50%, or if no project is missing the skill.
+ * 4. Compute coverage = projectsWithSkill.size.
+ * 5. Skip if coverage < computeGapThreshold(totalProjects), or if no project is missing the skill.
  * 6. Build and return a GapFlag for each qualifying filename.
  *
  * @param files    - Flat array of all SkillFile objects from a scan.
@@ -38,6 +62,9 @@ export function buildGapFlags(files: SkillFile[], projects: Project[]): GapFlag[
   if (totalProjects < 2) {
     return [];
   }
+
+  // Adaptive threshold: minimum number of projects a skill must appear in
+  const minProjectCount = computeGapThreshold(totalProjects);
 
   // Step 1: Exclude user-level files
   const projectLevelFiles = files.filter((f) => f.level !== 'user');
@@ -81,11 +108,8 @@ export function buildGapFlags(files: SkillFile[], projects: Project[]): GapFlag[
       continue;
     }
 
-    // Step 4: Compute coverage
-    const coverageRatio = presentProjectNames.size / totalProjects;
-
-    // Step 5: Skip if below 50% threshold
-    if (coverageRatio < 0.5) {
+    // Step 4 + 5: Skip if below adaptive threshold
+    if (presentProjectNames.size < minProjectCount) {
       continue;
     }
 

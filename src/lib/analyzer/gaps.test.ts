@@ -1,19 +1,21 @@
 /**
- * Unit tests for buildGapFlags()
+ * Unit tests for buildGapFlags() and computeGapThreshold()
  *
  * AC1: Correctly identifies gaps — skills present in some projects but missing from others
- * AC2: Respects coverage threshold — only flags gaps where coverage is >= 50%
+ * AC2: Respects adaptive coverage threshold — flags gaps where coverage meets the min count
+ * AC2b: Threshold auto-adjusts for small project counts (>= 2 projects for small sets)
  * AC3: Excludes user-level skills from gap analysis (they're available everywhere)
  * AC4: Unit tests with mock data
  */
 
 // AC1: "Correctly identifies gaps" → unit (pure logic, no I/O)
 // AC2: "Respects coverage threshold" → unit (pure logic)
+// AC2b: "Threshold auto-adjusts for small project counts" → unit (pure logic)
 // AC3: "Excludes user-level skills" → unit (pure logic)
 // AC4: "Unit tests" → unit
 
 import { describe, it, expect } from 'vitest';
-import { buildGapFlags } from './gaps';
+import { buildGapFlags, computeGapThreshold } from './gaps';
 import type { SkillFile, Project, GapFlag } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -101,7 +103,37 @@ describe('buildGapFlags — user-level exclusion', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC2: Coverage threshold >= 50%
+// AC2b: computeGapThreshold — adaptive threshold for small project counts
+// ---------------------------------------------------------------------------
+
+describe('computeGapThreshold', () => {
+  it('returns 2 for 2 projects (absolute minimum)', () => {
+    expect(computeGapThreshold(2)).toBe(2);
+  });
+
+  it('returns 2 for 3 projects (ceil(3*0.5)=2, still small)', () => {
+    expect(computeGapThreshold(3)).toBe(2);
+  });
+
+  it('returns 2 for 4 projects (ceil(4*0.5)=2)', () => {
+    expect(computeGapThreshold(4)).toBe(2);
+  });
+
+  it('returns 3 for 5 projects (ceil(5*0.5)=3)', () => {
+    expect(computeGapThreshold(5)).toBe(3);
+  });
+
+  it('returns 3 for 6 projects (ceil(6*0.5)=3)', () => {
+    expect(computeGapThreshold(6)).toBe(3);
+  });
+
+  it('returns 5 for 10 projects (ceil(10*0.5)=5)', () => {
+    expect(computeGapThreshold(10)).toBe(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC2: Coverage threshold >= 50% (or >= 2 for small sets)
 // ---------------------------------------------------------------------------
 
 describe('buildGapFlags — coverage threshold', () => {
@@ -122,7 +154,7 @@ describe('buildGapFlags — coverage threshold', () => {
     expect(result).toEqual([]);
   });
 
-  it('does not flag a skill present in 1 of 3 projects (33% < 50%)', () => {
+  it('does not flag a skill present in 1 of 3 projects (1 < adaptive min of 2)', () => {
     const skill = makeSkillFile({
       filePath: '/repos/project-a/.claude/rules/check.md',
       projectName: 'project-a',
@@ -136,6 +168,30 @@ describe('buildGapFlags — coverage threshold', () => {
 
     const result = buildGapFlags([skill], projects);
     expect(result).toEqual([]);
+  });
+
+  it('flags a skill present in 2 of 3 projects (adaptive min=2, previously would need >= 50%=2)', () => {
+    const skillA = makeSkillFile({
+      filePath: '/repos/project-a/.claude/rules/check.md',
+      projectName: 'project-a',
+      level: 'project',
+    });
+    const skillB = makeSkillFile({
+      filePath: '/repos/project-b/.claude/rules/check.md',
+      projectName: 'project-b',
+      level: 'project',
+    });
+    const projects = [
+      makeProject('project-a', [skillA]),
+      makeProject('project-b', [skillB]),
+      makeProject('project-c'), // missing
+    ];
+
+    // With adaptive threshold: 2 of 3 projects >= min(2) → gap flagged
+    const result = buildGapFlags([skillA, skillB], projects);
+    expect(result).toHaveLength(1);
+    expect(result[0].skillName).toBe('check.md');
+    expect(result[0].missingFrom[0].projectName).toBe('project-c');
   });
 
   it('flags a skill present in exactly 50% of projects (2 of 4)', () => {
@@ -372,25 +428,30 @@ describe('buildGapFlags — gap detection', () => {
     });
     // plugin skills have no projectName, so they can't be flagged as missing from a project
     // They should be treated as present in no project context
-    const projectSkill = makeSkillFile({
+    const projectSkillA = makeSkillFile({
       filePath: '/repos/project-a/.claude/rules/deploy.md',
       level: 'project',
       projectName: 'project-a',
       projectPath: '/repos/project-a',
     });
+    const projectSkillB = makeSkillFile({
+      filePath: '/repos/project-b/.claude/rules/deploy.md',
+      level: 'project',
+      projectName: 'project-b',
+      projectPath: '/repos/project-b',
+    });
     const projects = [
-      makeProject('project-a', [projectSkill]),
-      makeProject('project-b'),
+      makeProject('project-a', [projectSkillA]),
+      makeProject('project-b', [projectSkillB]),
+      makeProject('project-c'), // missing deploy.md
     ];
 
-    // Only 1 project (project-a) has deploy.md at project level
-    // 1 of 2 = 50% → should be flagged
-    const result = buildGapFlags([pluginSkill, projectSkill], projects);
-    // The plugin skill has no projectName, so only project-a counts as "present"
-    // 1 of 2 projects = 50% >= 50% → flagged
+    // 2 of 3 projects have deploy.md at project level
+    // adaptive min = max(2, ceil(3*0.5)) = max(2, 2) = 2 → 2 >= 2 → flagged
+    const result = buildGapFlags([pluginSkill, projectSkillA, projectSkillB], projects);
     expect(result).toHaveLength(1);
     expect(result[0].skillName).toBe('deploy.md');
-    expect(result[0].missingFrom[0].projectName).toBe('project-b');
+    expect(result[0].missingFrom[0].projectName).toBe('project-c');
   });
 });
 
