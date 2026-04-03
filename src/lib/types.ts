@@ -115,6 +115,34 @@ export interface GapFlag {
 }
 
 /**
+ * A contradiction flag — a frontmatter field that has different values across
+ * copies of the same skill file in different projects/levels.
+ *
+ * Only generated when the field is present in at least two copies AND the
+ * values actually differ (missing-vs-present is not flagged).
+ */
+export interface ContradictionFlag {
+  /** The shared filename (e.g. "save.md" or "SKILL.md"). */
+  skillName: string;
+
+  /** Which frontmatter field differs (e.g. "model", "effort"). */
+  field: string;
+
+  /**
+   * One entry per SkillFile that has this field, with the value it carries.
+   * Files without the field are omitted.
+   */
+  values: { projectName: string; level: string; value: unknown }[];
+
+  /**
+   * Severity of the contradiction:
+   * - `warning` — model or effort mismatches (affect behaviour significantly)
+   * - `info`    — allowed-tools or user-invocable mismatches (lower impact)
+   */
+  severity: 'warning' | 'info';
+}
+
+/**
  * The complete output of a single scan run.
  */
 export interface ScanResult {
