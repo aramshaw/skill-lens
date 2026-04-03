@@ -6,7 +6,7 @@ import type {
   ValidatePathResponse,
   ValidatePathErrorResponse,
 } from "@/app/api/validate-path/route";
-import { loadAdditionalPaths, saveAdditionalPaths } from "@/lib/storage";
+import { useAdditionalPaths } from "@/lib/hooks/use-additional-paths";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,16 +23,11 @@ type ValidationState =
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
-  const [paths, setPaths] = React.useState<string[]>([]);
+  const { paths, addPath, removePath } = useAdditionalPaths();
   const [input, setInput] = React.useState("");
   const [validation, setValidation] = React.useState<ValidationState>({
     status: "idle",
   });
-
-  // Load saved paths on mount
-  React.useEffect(() => {
-    setPaths(loadAdditionalPaths());
-  }, []);
 
   async function handleAdd() {
     const trimmed = input.trim();
@@ -66,9 +61,7 @@ export default function SettingsPage() {
       }
 
       const resolved = body.resolvedPath;
-      const next = paths.includes(resolved) ? paths : [...paths, resolved];
-      setPaths(next);
-      saveAdditionalPaths(next);
+      addPath(resolved);
       setInput("");
       setValidation({ status: "ok", resolvedPath: resolved });
     } catch (err) {
@@ -77,12 +70,6 @@ export default function SettingsPage() {
         message: err instanceof Error ? err.message : "Unknown error",
       });
     }
-  }
-
-  function handleRemove(p: string) {
-    const next = paths.filter((x) => x !== p);
-    setPaths(next);
-    saveAdditionalPaths(next);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -178,7 +165,7 @@ export default function SettingsPage() {
                         {p}
                       </span>
                       <button
-                        onClick={() => handleRemove(p)}
+                        onClick={() => removePath(p)}
                         className="shrink-0 text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
                         aria-label={`Remove ${p}`}
                       >
@@ -192,7 +179,7 @@ export default function SettingsPage() {
 
             <p className="text-xs text-muted-foreground">
               Paths are saved to your browser and take effect immediately
-              &mdash; the skill list will re-scan automatically.
+              &mdash; navigate to the Inventory to see the updated scan results.
             </p>
           </section>
         </div>
