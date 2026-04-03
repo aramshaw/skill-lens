@@ -55,6 +55,58 @@ export function computeProjectCounts(skills: SkillFile[]): ProjectCounts {
   };
 }
 
+/**
+ * Like computeProjectCounts, but also ensures every project in `allProjects`
+ * appears in the result — even projects that have 0 skill files.
+ *
+ * Projects from `allProjects` that are not referenced by any skill are included
+ * with count 0. Projects referenced in skills but absent from `allProjects` are
+ * also included (merged in from the skill list, as before).
+ *
+ * Accepts a narrow type `{ name: string }[]` so both `Project[]` and `ProjectRef[]`
+ * (page-local type) can be passed without mapping.
+ */
+export function computeProjectCountsWithAllProjects(
+  skills: SkillFile[],
+  allProjects: { name: string }[]
+): ProjectCounts {
+  // Start with skill-derived counts
+  const projectMap = new Map<string, number>();
+  let userCount = 0;
+  let pluginCount = 0;
+
+  for (const skill of skills) {
+    if (skill.level === "user") {
+      userCount++;
+    } else if (skill.level === "plugin") {
+      pluginCount++;
+    } else if (skill.projectName !== null) {
+      projectMap.set(
+        skill.projectName,
+        (projectMap.get(skill.projectName) ?? 0) + 1
+      );
+    }
+  }
+
+  // Ensure every project from the full list is present (with 0 if no skills found)
+  for (const proj of allProjects) {
+    if (!projectMap.has(proj.name)) {
+      projectMap.set(proj.name, 0);
+    }
+  }
+
+  const projects: ProjectCount[] = Array.from(projectMap.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    projects,
+    userCount,
+    pluginCount,
+    total: skills.length,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Filter type
 // ---------------------------------------------------------------------------
@@ -185,6 +237,13 @@ function SidebarContent({ counts, activeFilter, onSelect }: SidebarContentProps)
 export interface ProjectSidebarProps {
   /** All flattened skill files (projects + user + plugin). */
   skills: SkillFile[];
+  /**
+   * Full list of discovered projects from the scan API response.
+   * When provided, projects with 0 skill files will still appear in the sidebar.
+   * If omitted, the sidebar falls back to deriving the project list from skill files only.
+   * Accepts any object with at least a `name` field (compatible with Project and ProjectRef).
+   */
+  projects?: { name: string }[];
   /** Current filter value. */
   activeFilter: ProjectFilter;
   /** Called when the user clicks a sidebar entry. */
@@ -193,11 +252,18 @@ export interface ProjectSidebarProps {
 
 export function ProjectSidebar({
   skills,
+  projects,
   activeFilter,
   onFilterChange,
 }: ProjectSidebarProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const counts = React.useMemo(() => computeProjectCounts(skills), [skills]);
+  const counts = React.useMemo(
+    () =>
+      projects !== undefined
+        ? computeProjectCountsWithAllProjects(skills, projects)
+        : computeProjectCounts(skills),
+    [skills, projects]
+  );
 
   function handleSelect(filter: ProjectFilter) {
     onFilterChange(filter);
