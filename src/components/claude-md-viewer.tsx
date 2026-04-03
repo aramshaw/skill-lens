@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
-import { ExternalLinkIcon, FileTextIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FileTextIcon } from "lucide-react";
 import type { ClaudeMdResponse } from "@/app/api/claude-md/route";
+import { OpenInEditorButton } from "@/components/open-in-editor-button";
+import { PROSE_CLASSES } from "@/lib/prose-classes";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,45 +31,6 @@ type LoadState =
 type TabKey = "project" | "user";
 
 // ---------------------------------------------------------------------------
-// Open in Editor button
-// ---------------------------------------------------------------------------
-
-function OpenInEditorButton({ filePath }: { filePath: string }) {
-  const [status, setStatus] = React.useState<"idle" | "loading" | "error">(
-    "idle"
-  );
-
-  async function handleOpen() {
-    setStatus("loading");
-    try {
-      const res = await fetch("/api/open", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filePath }),
-      });
-      setStatus(res.ok ? "idle" : "error");
-      if (!res.ok) setTimeout(() => setStatus("idle"), 3000);
-    } catch {
-      setStatus("error");
-      setTimeout(() => setStatus("idle"), 3000);
-    }
-  }
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleOpen}
-      disabled={status === "loading"}
-      title={`Open ${filePath} in default editor`}
-    >
-      <ExternalLinkIcon className="size-3.5" />
-      {status === "error" ? "Failed to open" : "Open in Editor"}
-    </Button>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Markdown panel
 // ---------------------------------------------------------------------------
 
@@ -89,11 +51,11 @@ function MarkdownPanel({
         >
           {filePath}
         </span>
-        <OpenInEditorButton filePath={filePath} />
+        <OpenInEditorButton filePath={filePath} title={`Open ${filePath} in default editor`} />
       </div>
 
       {/* Rendered markdown */}
-      <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-muted [&_code:not(pre_code)]:px-1 [&_code:not(pre_code)]:py-0.5 [&_code:not(pre_code)]:text-xs">
+      <div className={PROSE_CLASSES}>
         <ReactMarkdown>{content}</ReactMarkdown>
       </div>
     </div>
