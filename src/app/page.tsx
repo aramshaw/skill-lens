@@ -11,6 +11,7 @@ import type { ProjectFilter } from "@/components/project-sidebar";
 import type { SkillFile } from "@/lib/types";
 import type { ScanResponse, ScanErrorResponse } from "@/app/api/scan/route";
 import type { AnalyzeResponse } from "@/app/api/analyze/route";
+import { deduplicateSkills } from "@/lib/skills";
 
 /** Minimal project info needed to look up paths for the CLAUDE.md viewer. */
 interface ProjectRef {
@@ -102,12 +103,15 @@ export default function Home() {
       }
       const data = (await res.json()) as ScanResponse;
 
-      // Flatten all skills from all levels
-      const allSkills: SkillFile[] = [
+      // Flatten all skills from all levels and deduplicate by filePath.
+      // The server-side scanner already deduplicates project skills against
+      // user/plugin skills, but we apply a second pass here as a safety net
+      // in case any additional sources introduce the same physical file.
+      const allSkills: SkillFile[] = deduplicateSkills([
         ...data.projects.flatMap((p) => p.skills),
         ...data.userSkills,
         ...data.pluginSkills,
-      ];
+      ]);
 
       setScan({
         status: "ok",
