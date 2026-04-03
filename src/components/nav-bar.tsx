@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useScanContext } from "@/components/scan-context";
+import { formatScanTimestamp } from "@/lib/format-scan-timestamp";
 
 interface NavLink {
   href: string;
@@ -68,7 +69,7 @@ export function NavBar() {
             <span className="text-xs text-muted-foreground hidden sm:block">
               Last scan{" "}
               <time dateTime={scannedAt}>
-                {new Date(scannedAt).toLocaleTimeString()}
+                {formatScanTimestamp(scannedAt)}
               </time>
             </span>
           )}

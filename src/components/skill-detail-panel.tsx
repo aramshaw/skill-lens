@@ -279,13 +279,15 @@ export function SkillDetailPanel({ skill, onClose, overlapIdentities }: SkillDet
 
             {/* Scrollable body */}
             <div className="flex-1 overflow-y-auto px-5 pb-5 flex flex-col gap-5">
-              {/* File path */}
-              <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs font-mono text-muted-foreground">
-                <span className="flex-1 truncate" title={skill.filePath}>
+              {/* File path — wraps rather than truncates so the full path is always readable */}
+              <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs font-mono text-muted-foreground">
+                <span className="flex-1 break-all">
                   {skill.filePath}
                 </span>
-                <CopyButton text={skill.filePath} />
-                <OpenInEditorButton filePath={skill.filePath} />
+                <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                  <CopyButton text={skill.filePath} />
+                  <OpenInEditorButton filePath={skill.filePath} />
+                </div>
               </div>
 
               {/* View overlaps link — only shown when this skill has overlap clusters */}

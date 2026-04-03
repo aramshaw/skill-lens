@@ -119,7 +119,7 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Configure additional scan paths and preferences.
+              Configure additional scan paths.
             </p>
           </div>
 
@@ -205,8 +205,8 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Changes take effect on your next scan. Use the Re-scan button in
-              the nav bar to apply updated paths immediately.
+              Paths are saved to your browser. Use the Re-scan button in the
+              nav bar to apply changes.
             </p>
           </section>
         </div>
