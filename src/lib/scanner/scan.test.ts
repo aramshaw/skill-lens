@@ -387,6 +387,125 @@ describe('scanAll — graceful error handling', () => {
 });
 
 // ---------------------------------------------------------------------------
+// AC5: Deduplication — same filePath from multiple sources
+// ---------------------------------------------------------------------------
+
+describe('deduplicateSkills — filePath deduplication', () => {
+  it('removes duplicate entries with the same filePath', async () => {
+    const { deduplicateSkills } = await import('./scan');
+
+    const file1 = makeSkillFile({
+      filePath: '/home/testuser/.claude/skills/my-skill/SKILL.md',
+      level: 'user',
+      projectName: null,
+    });
+    const file2 = makeSkillFile({
+      filePath: '/home/testuser/.claude/skills/my-skill/SKILL.md',
+      level: 'project',
+      projectName: 'testuser',
+    });
+
+    const result = deduplicateSkills([file1, file2]);
+    expect(result).toHaveLength(1);
+  });
+
+  it('prefers user-level over project-level for the same filePath', async () => {
+    const { deduplicateSkills } = await import('./scan');
+
+    const userFile = makeSkillFile({
+      filePath: '/home/testuser/.claude/skills/my-skill/SKILL.md',
+      level: 'user',
+      projectName: null,
+    });
+    const projectFile = makeSkillFile({
+      filePath: '/home/testuser/.claude/skills/my-skill/SKILL.md',
+      level: 'project',
+      projectName: 'testuser',
+    });
+
+    // user appears second — still wins
+    const result = deduplicateSkills([projectFile, userFile]);
+    expect(result).toHaveLength(1);
+    expect(result[0].level).toBe('user');
+  });
+
+  it('prefers plugin-level over project-level for the same filePath', async () => {
+    const { deduplicateSkills } = await import('./scan');
+
+    const pluginFile = makeSkillFile({
+      filePath: '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
+      level: 'plugin',
+      projectName: null,
+    });
+    const projectFile = makeSkillFile({
+      filePath: '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
+      level: 'project',
+      projectName: 'testuser',
+    });
+
+    const result = deduplicateSkills([projectFile, pluginFile]);
+    expect(result).toHaveLength(1);
+    expect(result[0].level).toBe('plugin');
+  });
+
+  it('keeps all entries when filePaths are distinct', async () => {
+    const { deduplicateSkills } = await import('./scan');
+
+    const a = makeSkillFile({ filePath: '/repos/a/.claude/skills/a.md', level: 'project' });
+    const b = makeSkillFile({ filePath: '/repos/b/.claude/skills/b.md', level: 'project' });
+    const c = makeSkillFile({ filePath: '/home/testuser/.claude/skills/c.md', level: 'user' });
+
+    const result = deduplicateSkills([a, b, c]);
+    expect(result).toHaveLength(3);
+  });
+
+  it('handles empty input', async () => {
+    const { deduplicateSkills } = await import('./scan');
+    expect(deduplicateSkills([])).toEqual([]);
+  });
+});
+
+describe('scanAll — home directory as project deduplication', () => {
+  it('does not include user-level files as project-level when home dir is a project', async () => {
+    // Simulate: home dir (/home/testuser) listed as a project AND user-level scan
+    // Both find the same file at /home/testuser/.claude/skills/my-skill/SKILL.md
+    const homeProject = makeProject('testuser', '/home/testuser');
+    const sharedPath = '/home/testuser/.claude/skills/my-skill/SKILL.md';
+
+    const userFile = makeSkillFile({ filePath: sharedPath, level: 'user', projectName: null });
+    const projectFile = makeSkillFile({ filePath: sharedPath, level: 'project', projectName: 'testuser' });
+
+    mockFg.mockImplementation(async (patterns: string | string[]) => {
+      const patternList = Array.isArray(patterns) ? patterns : [patterns];
+      // Both project scan and user-level scan return the same file
+      if (patternList.some((p) => p.includes('/home/testuser'))) {
+        return [sharedPath];
+      }
+      return [];
+    });
+
+    mockParseSkillFile.mockImplementation(
+      (_filePath: string, level: SkillFile['level']) => {
+        if (level === 'user') return userFile;
+        return projectFile;
+      }
+    );
+
+    mockFs.existsSync.mockReturnValue(false); // no plugins
+
+    const result = await scanAll([homeProject]);
+
+    // The same physical file should appear only once across all arrays
+    const projectSkillPaths = result.projects.flatMap((p) => p.skills.map((s) => s.filePath));
+    const userSkillPaths = result.userSkills.map((s) => s.filePath);
+    const allPaths = [...projectSkillPaths, ...userSkillPaths];
+
+    const uniquePaths = new Set(allPaths);
+    expect(uniquePaths.size).toBe(allPaths.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC4: Logs scan stats
 // ---------------------------------------------------------------------------
 

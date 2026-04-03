@@ -170,6 +170,11 @@ async function scanAdditionalPath(dirPath: string): Promise<SkillFile[]> {
   return scanProject(project);
 }
 
+// Re-export deduplicateSkills so callers can import from this module.
+// The implementation lives in lib/skills.ts (no server-only deps) so it can
+// also be imported safely from client components.
+export { deduplicateSkills } from '@/lib/skills';
+
 // ---------------------------------------------------------------------------
 // Stat counters
 // ---------------------------------------------------------------------------
@@ -226,10 +231,20 @@ export async function scanAll(
       pluginScanPromise,
     ]);
 
-  // Populate project.skills in-place (clone to avoid mutating input)
+  // Build a set of filePaths already covered by user-level and plugin-level scans.
+  // Any project-level skill that shares a filePath with a user/plugin skill is a
+  // duplicate — most commonly caused by the home directory being listed as a project
+  // in ~/.claude.json, which makes ~/.claude/skills/** appear at both levels.
+  const higherLevelPaths = new Set<string>([
+    ...userSkills.map((s) => s.filePath),
+    ...pluginSkills.map((s) => s.filePath),
+  ]);
+
+  // Populate project.skills in-place (clone to avoid mutating input), filtering
+  // out any files that are already present at user or plugin level.
   const populatedProjects: Project[] = projects.map((p, i) => ({
     ...p,
-    skills: projectSkillArrays[i],
+    skills: projectSkillArrays[i].filter((s) => !higherLevelPaths.has(s.filePath)),
   }));
 
   // Merge additional path results into userSkills (they show as anonymous project entries)
