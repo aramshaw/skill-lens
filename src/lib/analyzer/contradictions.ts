@@ -4,10 +4,12 @@
  *
  * This module is pure (no I/O). It accepts a flat array of SkillFile objects
  * and returns ContradictionFlag objects for every frontmatter field that has
- * at least two different values across files sharing the same filename.
+ * at least two different values across files sharing the same skill identity.
  *
  * Rules:
- * - Files are grouped by filename (basename only, case-sensitive).
+ * - Files are grouped by skill identity (parentDirName/filename), matching the
+ *   pattern used by the overlap analyzer — this prevents false clusters from
+ *   common filenames like SKILL.md.
  * - Only the four specified fields are compared: model, effort, allowed-tools,
  *   user-invocable.
  * - A field is only flagged if it is explicitly present in ≥ 2 files AND those
@@ -15,8 +17,8 @@
  * - Severity: 'warning' for model/effort mismatches; 'info' for all others.
  */
 
-import * as path from 'path';
 import type { SkillFile, ContradictionFlag } from '@/lib/types';
+import { skillIdentityKey } from '@/lib/analyzer/overlaps';
 
 /** Frontmatter fields to compare and their assigned severity. */
 const FIELDS_TO_COMPARE: { field: string; severity: ContradictionFlag['severity'] }[] = [
@@ -28,10 +30,10 @@ const FIELDS_TO_COMPARE: { field: string; severity: ContradictionFlag['severity'
 
 /**
  * Analyze a flat list of SkillFiles and return contradiction flags for
- * frontmatter fields that differ across copies of the same filename.
+ * frontmatter fields that differ across copies of the same skill identity.
  *
  * Algorithm:
- * 1. Group files by filename (basename only, case-sensitive).
+ * 1. Group files by skill identity (parentDirName/filename, case-sensitive).
  * 2. Discard singleton groups (no copies to compare).
  * 3. For each group and each watched field:
  *    a. Collect entries where the field is explicitly set (not undefined).
@@ -44,22 +46,22 @@ const FIELDS_TO_COMPARE: { field: string; severity: ContradictionFlag['severity'
  * @returns An array of ContradictionFlag objects (may be empty).
  */
 export function buildContradictionFlags(files: SkillFile[]): ContradictionFlag[] {
-  // Step 1 — group by filename
-  const byFilename = new Map<string, SkillFile[]>();
+  // Step 1 — group by skill identity (parentDirName/filename)
+  const byIdentity = new Map<string, SkillFile[]>();
 
   for (const file of files) {
-    const filename = path.basename(file.filePath);
-    const group = byFilename.get(filename);
+    const identity = skillIdentityKey(file.filePath);
+    const group = byIdentity.get(identity);
     if (group) {
       group.push(file);
     } else {
-      byFilename.set(filename, [file]);
+      byIdentity.set(identity, [file]);
     }
   }
 
   const flags: ContradictionFlag[] = [];
 
-  for (const [filename, group] of byFilename) {
+  for (const [identity, group] of byIdentity) {
     // Step 2 — skip singletons
     if (group.length < 2) {
       continue;
@@ -94,7 +96,7 @@ export function buildContradictionFlags(files: SkillFile[]): ContradictionFlag[]
 
       // Step 3e — emit a flag
       flags.push({
-        skillName: filename,
+        skillName: identity,
         field,
         values: entries,
         severity,

@@ -279,7 +279,8 @@ describe('GET /api/analyze — contradictions', () => {
     expect(contradictions.length).toBeGreaterThan(0);
     const modelContradiction = contradictions.find((c) => c.field === 'model');
     expect(modelContradiction).toBeDefined();
-    expect(modelContradiction!.skillName).toBe('SKILL.md');
+    // skillName is now the skill identity key (parentDir/filename)
+    expect(modelContradiction!.skillName).toBe('save/SKILL.md');
     expect(modelContradiction!.severity).toBe('warning');
   });
 });

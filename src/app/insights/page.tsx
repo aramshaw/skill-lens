@@ -8,6 +8,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { DiffView } from "@/components/diff-view";
+import { skillIdentityKey } from "@/lib/analyzer/overlaps";
 import type { GapFlag, ContradictionFlag, SkillFile, OverlapCluster } from "@/lib/types";
 import type { AnalyzeResponse, AnalyzeErrorResponse } from "@/app/api/analyze/route";
 
@@ -156,10 +157,12 @@ function ContradictionCard({ contradiction, allFiles, onViewDiff }: Contradictio
     return colorPalette[idx % colorPalette.length] ?? colorPalette[0];
   }
 
-  // Find the files involved for diff view
+  // skillName is now a skill identity key (parentDir/filename or filename).
+  // Match files using skillIdentityKey() so we correctly pair files from the
+  // same skill, even when the filename alone is generic (e.g. SKILL.md).
   const involvedFiles = allFiles.filter(
     (f) =>
-      f.filePath.endsWith(contradiction.skillName) &&
+      skillIdentityKey(f.filePath) === contradiction.skillName &&
       contradiction.values.some(
         (v) =>
           v.projectName === (f.projectName ?? "(user)") &&
@@ -417,8 +420,8 @@ export default function InsightsPage() {
                   <div className="rounded-xl border border-border bg-muted/20 px-5 py-10 text-center text-sm text-muted-foreground">
                     <p className="font-medium text-base mb-1">No gaps found</p>
                     <p>
-                      Skills that are common (present in ≥50% of projects) but missing from
-                      some will appear here.
+                      Skills present in ≥2 projects (or ≥50% for larger workspaces) but missing
+                      from others will appear here.
                     </p>
                   </div>
                 ) : (
@@ -446,25 +449,40 @@ export default function InsightsPage() {
                     </span>
                   </h2>
 
-                  {/* Severity filter */}
+                  {/* Severity filter with tooltips explaining each level */}
                   <div className="flex items-center gap-2">
-                    {(["all", "warning", "info"] as SeverityFilter[]).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => setSeverityFilter(mode)}
-                        className={
-                          severityFilter === mode
-                            ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
-                            : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
-                        }
-                      >
-                        {mode === "all"
-                          ? `All (${scan.contradictions.length})`
-                          : mode === "warning"
-                            ? `Warning (${scan.contradictions.filter((c) => c.severity === "warning").length})`
-                            : `Info (${scan.contradictions.filter((c) => c.severity === "info").length})`}
-                      </button>
-                    ))}
+                    <button
+                      onClick={() => setSeverityFilter("all")}
+                      className={
+                        severityFilter === "all"
+                          ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
+                          : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+                      }
+                    >
+                      All ({scan.contradictions.length})
+                    </button>
+                    <button
+                      onClick={() => setSeverityFilter("warning")}
+                      title="Warning: model or effort fields differ — these settings affect behaviour significantly"
+                      className={
+                        severityFilter === "warning"
+                          ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
+                          : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+                      }
+                    >
+                      Warning ({scan.contradictions.filter((c) => c.severity === "warning").length})
+                    </button>
+                    <button
+                      onClick={() => setSeverityFilter("info")}
+                      title="Info: allowed-tools or user-invocable fields differ — lower impact mismatches"
+                      className={
+                        severityFilter === "info"
+                          ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
+                          : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+                      }
+                    >
+                      Info ({scan.contradictions.filter((c) => c.severity === "info").length})
+                    </button>
                   </div>
                 </div>
 
