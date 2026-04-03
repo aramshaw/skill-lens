@@ -10,6 +10,13 @@ import {
 } from "@/components/ui/card";
 import { DiffView } from "@/components/diff-view";
 import { locationLabel } from "@/lib/overlaps-utils";
+import {
+  filterClustersBySearch,
+  filterClustersByLevel,
+  sortClusters,
+  shouldShowDiff,
+} from "@/lib/overlaps-filter";
+import type { LevelFilter } from "@/lib/overlaps-filter";
 import type { OverlapCluster } from "@/lib/types";
 import type { AnalyzeResponse, AnalyzeErrorResponse } from "@/app/api/analyze/route";
 
@@ -17,7 +24,7 @@ import type { AnalyzeResponse, AnalyzeErrorResponse } from "@/app/api/analyze/ro
 // Types
 // ---------------------------------------------------------------------------
 
-type FilterMode = "all" | "drifted" | "identical";
+type StatusFilter = "all" | "drifted" | "identical";
 
 type ScanState =
   | { status: "loading" }
@@ -54,6 +61,7 @@ interface ClusterCardProps {
 
 function ClusterCard({ cluster, onOpenDiff }: ClusterCardProps) {
   const isDrifted = cluster.status === "drifted";
+  const showDiff = shouldShowDiff(cluster);
 
   return (
     <Card
@@ -77,6 +85,11 @@ function ClusterCard({ cluster, onOpenDiff }: ClusterCardProps) {
           {isDrifted && (
             <span className="ml-2 text-amber-700 dark:text-amber-400 font-medium">
               — content has diverged across locations
+            </span>
+          )}
+          {!isDrifted && (
+            <span className="ml-2 text-green-700 dark:text-green-400 font-medium">
+              — all copies are in sync
             </span>
           )}
         </p>
@@ -115,8 +128,8 @@ function ClusterCard({ cluster, onOpenDiff }: ClusterCardProps) {
           ))}
         </ul>
 
-        {/* Diff button — only shown when there are 2+ files to compare */}
-        {cluster.files.length >= 2 && (
+        {/* Diff button — only shown for drifted clusters (identical clusters have no diff to show) */}
+        {showDiff && cluster.files.length >= 2 && (
           <div className="pt-1">
             <button
               onClick={() => onOpenDiff(cluster)}
@@ -193,7 +206,9 @@ function DiffModal({ cluster, onClose }: DiffModalProps) {
 
 export default function OverlapsPage() {
   const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
-  const [filter, setFilter] = React.useState<FilterMode>("all");
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
+  const [levelFilter, setLevelFilter] = React.useState<LevelFilter>("all");
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [activeDiff, setActiveDiff] = React.useState<OverlapCluster | null>(null);
 
   React.useEffect(() => {
@@ -223,12 +238,23 @@ export default function OverlapsPage() {
     void runAnalyze();
   }, []);
 
-  // Derived: apply filter
+  // Derived: apply sort → status filter → level filter → search
   const visibleClusters = React.useMemo(() => {
     if (scan.status !== "ok") return [];
-    if (filter === "all") return scan.clusters;
-    return scan.clusters.filter((c) => c.status === filter);
-  }, [scan, filter]);
+    let result = sortClusters(scan.clusters);
+    if (statusFilter !== "all") {
+      result = result.filter((c) => c.status === statusFilter);
+    }
+    result = filterClustersByLevel(result, levelFilter);
+    result = filterClustersBySearch(result, searchQuery);
+    return result;
+  }, [scan, statusFilter, levelFilter, searchQuery]);
+
+  // Count clusters that have at least one non-plugin file (used in level toggle label)
+  const nonPluginCount = React.useMemo(() => {
+    if (scan.status !== "ok") return 0;
+    return scan.clusters.filter((c) => c.files.some((f) => f.level !== "plugin")).length;
+  }, [scan]);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-background">
@@ -254,33 +280,85 @@ export default function OverlapsPage() {
           {scan.status === "ok" && (
             <>
               {/* Toolbar */}
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-2">
-                  {/* Filter buttons */}
-                  {(["all", "drifted", "identical"] as FilterMode[]).map(
-                    (mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => setFilter(mode)}
-                        className={
-                          filter === mode
-                            ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
-                            : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
-                        }
-                      >
-                        {mode === "all"
-                          ? `All (${scan.clusters.length})`
-                          : mode === "drifted"
-                            ? `Drifted (${scan.clusters.filter((c) => c.status === "drifted").length})`
-                            : `Identical (${scan.clusters.filter((c) => c.status === "identical").length})`}
-                      </button>
-                    )
-                  )}
+              <div className="flex flex-col gap-3">
+                {/* Search input */}
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m21 21-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+                    />
+                  </svg>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search clusters…"
+                    className="w-full rounded-md border border-input bg-background pl-8 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    aria-label="Search overlap clusters"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Scanned in {scan.durationMs}ms &middot;{" "}
-                  {new Date(scan.scannedAt).toLocaleTimeString()}
-                </p>
+
+                {/* Filter row */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status filter buttons */}
+                    {(["all", "drifted", "identical"] as StatusFilter[]).map(
+                      (mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setStatusFilter(mode)}
+                          className={
+                            statusFilter === mode
+                              ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
+                              : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+                          }
+                        >
+                          {mode === "all"
+                            ? `All (${scan.clusters.length})`
+                            : mode === "drifted"
+                              ? `Drifted (${scan.clusters.filter((c) => c.status === "drifted").length})`
+                              : `Identical (${scan.clusters.filter((c) => c.status === "identical").length})`}
+                        </button>
+                      )
+                    )}
+
+                    {/* Separator */}
+                    <span className="text-border text-sm select-none mx-1">|</span>
+
+                    {/* Level filter toggle */}
+                    <button
+                      onClick={() =>
+                        setLevelFilter((prev) =>
+                          prev === "all" ? "no-plugins" : "all"
+                        )
+                      }
+                      className={
+                        levelFilter === "no-plugins"
+                          ? "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium bg-foreground text-background transition-colors"
+                          : "inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+                      }
+                      aria-pressed={levelFilter === "no-plugins"}
+                    >
+                      {levelFilter === "no-plugins"
+                        ? `Hide plugins (${nonPluginCount})`
+                        : "Hide plugins"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Scanned in {scan.durationMs}ms &middot;{" "}
+                    {new Date(scan.scannedAt).toLocaleTimeString()}
+                  </p>
+                </div>
               </div>
 
               {/* Empty state — no overlaps found at all */}
@@ -294,10 +372,12 @@ export default function OverlapsPage() {
                 </div>
               )}
 
-              {/* Empty state — filter produced no results but clusters exist */}
+              {/* Empty state — filters produced no results but clusters exist */}
               {scan.clusters.length > 0 && visibleClusters.length === 0 && (
                 <div className="rounded-xl border border-border bg-muted/20 px-5 py-10 text-center text-sm text-muted-foreground">
-                  No {filter} clusters found.
+                  {searchQuery.trim()
+                    ? `No clusters match "${searchQuery.trim()}".`
+                    : `No ${statusFilter !== "all" ? statusFilter : ""} clusters found.`}
                 </div>
               )}
 
