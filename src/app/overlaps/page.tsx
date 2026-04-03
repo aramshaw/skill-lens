@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   Card,
   CardHeader,
@@ -234,26 +233,7 @@ export default function OverlapsPage() {
   }, [scan, filter]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border px-6 py-4 shrink-0">
-        <div className="max-w-7xl mx-auto flex items-baseline gap-3">
-          <h1 className="text-xl font-bold tracking-tight">Skill Lens</h1>
-          <span className="text-sm text-muted-foreground">
-            Overlap clusters
-          </span>
-          <nav className="ml-auto flex items-center gap-4 text-sm">
-            <Link
-              href="/"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Inventory
-            </Link>
-            <span className="text-foreground font-medium">Overlaps</span>
-          </nav>
-        </div>
-      </header>
-
+    <div className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-background">
       {/* Main content */}
       <main className="flex-1 px-6 py-6">
         <div className="max-w-7xl mx-auto flex flex-col gap-4">
