@@ -14,6 +14,7 @@ import type { SkillFile } from "@/lib/types";
 import type { ScanResponse, ScanErrorResponse } from "@/app/api/scan/route";
 import type { AnalyzeResponse } from "@/app/api/analyze/route";
 import { deduplicateSkills } from "@/lib/skills";
+import { filterSkillsByProject } from "@/lib/filter-skills";
 
 /** Minimal project info needed to look up paths for the CLAUDE.md viewer. */
 interface ProjectRef {
@@ -203,35 +204,38 @@ export default function Home() {
 
           {scan.status === "ok" && (
             <>
-              {/* Dashboard summary stats */}
-              {stats && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <StatCard
-                    label="Total skills"
-                    value={stats.totalSkills}
-                    href="/"
-                    colorClass="text-foreground"
-                  />
-                  <StatCard
-                    label="Overlaps"
-                    value={stats.overlaps}
-                    href="/overlaps"
-                    colorClass="text-amber-600 dark:text-amber-400"
-                  />
-                  <StatCard
-                    label="Gaps"
-                    value={stats.gaps}
-                    href="/insights"
-                    colorClass="text-orange-600 dark:text-orange-400"
-                  />
-                  <StatCard
-                    label="Contradictions"
-                    value={stats.contradictions}
-                    href="/insights"
-                    colorClass="text-blue-600 dark:text-blue-400"
-                  />
-                </div>
-              )}
+              {/* Dashboard summary stats — "Total skills" reflects the active filter */}
+              {stats && (() => {
+                const filteredSkills = filterSkillsByProject(scan.skills, projectFilter);
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <StatCard
+                      label={projectFilter !== null ? "Filtered skills" : "Total skills"}
+                      value={filteredSkills.length}
+                      href="/"
+                      colorClass="text-foreground"
+                    />
+                    <StatCard
+                      label="Overlaps"
+                      value={stats.overlaps}
+                      href="/overlaps"
+                      colorClass="text-amber-600 dark:text-amber-400"
+                    />
+                    <StatCard
+                      label="Gaps"
+                      value={stats.gaps}
+                      href="/insights"
+                      colorClass="text-orange-600 dark:text-orange-400"
+                    />
+                    <StatCard
+                      label="Contradictions"
+                      value={stats.contradictions}
+                      href="/insights"
+                      colorClass="text-blue-600 dark:text-blue-400"
+                    />
+                  </div>
+                );
+              })()}
 
               {/* Scan meta + settings */}
               <div className="flex items-center justify-between">
