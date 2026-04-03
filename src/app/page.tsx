@@ -3,14 +3,21 @@
 import * as React from "react";
 import { InventoryTable } from "@/components/inventory-table";
 import { ProjectSidebar } from "@/components/project-sidebar";
+import { ClaudeMdViewer } from "@/components/claude-md-viewer";
 import type { ProjectFilter } from "@/components/project-sidebar";
 import type { SkillFile } from "@/lib/types";
 import type { ScanResponse, ScanErrorResponse } from "@/app/api/scan/route";
 
+/** Minimal project info needed to look up paths for the CLAUDE.md viewer. */
+interface ProjectRef {
+  name: string;
+  path: string;
+}
+
 type ScanState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ok"; skills: SkillFile[]; scannedAt: string; durationMs: number };
+  | { status: "ok"; skills: SkillFile[]; projects: ProjectRef[]; scannedAt: string; durationMs: number };
 
 export default function Home() {
   const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
@@ -35,6 +42,7 @@ export default function Home() {
         setScan({
           status: "ok",
           skills: allSkills,
+          projects: data.projects.map((p) => ({ name: p.name, path: p.path })),
           scannedAt: data.scannedAt,
           durationMs: data.scanDurationMs,
         });
@@ -106,11 +114,25 @@ export default function Home() {
                     activeFilter={projectFilter}
                     onFilterChange={setProjectFilter}
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex flex-col gap-4">
                     <InventoryTable
                       skills={scan.skills}
                       projectFilter={projectFilter}
                     />
+                    {/* CLAUDE.md viewer — shown when a specific project is selected */}
+                    {projectFilter !== null &&
+                      projectFilter !== "__user__" &&
+                      projectFilter !== "__plugin__" && (() => {
+                        const proj = scan.projects.find(
+                          (p) => p.name === projectFilter
+                        );
+                        return (
+                          <ClaudeMdViewer
+                            projectPath={proj?.path ?? null}
+                            projectName={proj?.name ?? projectFilter}
+                          />
+                        );
+                      })()}
                   </div>
                 </div>
               )}
