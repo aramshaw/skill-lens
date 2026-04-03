@@ -64,7 +64,7 @@ function ClusterCard({ cluster, onOpenDiff }: ClusterCardProps) {
       }
     >
       <CardHeader className="border-b">
-        <CardTitle className="font-mono text-sm">{cluster.filename}</CardTitle>
+        <CardTitle className="font-mono text-sm">{cluster.skillIdentity}</CardTitle>
         <CardAction>
           <StatusBadge status={cluster.status} />
         </CardAction>
@@ -155,14 +155,14 @@ function DiffModal({ cluster, onClose }: DiffModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={`Diff view for ${cluster.filename}`}
+      aria-label={`Diff view for ${cluster.skillIdentity}`}
     >
       <div className="relative flex flex-col w-full max-w-6xl h-[80vh] rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
         {/* Modal header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-semibold">
-              {cluster.filename}
+              {cluster.skillIdentity}
             </span>
             <StatusBadge status={cluster.status} />
             <span className="text-xs text-muted-foreground ml-1">
@@ -306,7 +306,7 @@ export default function OverlapsPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {visibleClusters.map((cluster) => (
                     <ClusterCard
-                      key={cluster.filename}
+                      key={cluster.skillIdentity}
                       cluster={cluster}
                       onOpenDiff={setActiveDiff}
                     />

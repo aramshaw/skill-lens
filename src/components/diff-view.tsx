@@ -225,7 +225,7 @@ function FileSelector({
       >
         {files.map((file, i) => (
           <option key={file.filePath} value={i}>
-            {locationLabel(file)} — {file.filePath.split(/[\\/]/).pop() ?? file.filePath}
+            {file.name} ({locationLabel(file)})
           </option>
         ))}
       </select>

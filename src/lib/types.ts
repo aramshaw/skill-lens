@@ -64,13 +64,24 @@ export interface Project {
 }
 
 /**
- * A cluster of SkillFiles that share the same filename across different locations.
+ * A cluster of SkillFiles that share the same skill identity across different locations.
  *
- * Singletons (skills that exist in only one location) are excluded — a cluster
+ * Skill identity is defined as `parentDirName/filename` (e.g. "code-review/SKILL.md").
+ * This prevents unrelated skills that happen to share a filename (e.g. SKILL.md, RULE.md)
+ * from being grouped into one large false cluster.
+ *
+ * Singletons (skills whose identity appears in only one location) are excluded — a cluster
  * must contain at least two files.
  */
 export interface OverlapCluster {
-  /** The shared filename (e.g. "save.md" or "SKILL.md"). */
+  /**
+   * The skill identity key used for clustering: `parentDirName/filename`.
+   * Example: "code-review/SKILL.md", "deploy/RULE.md".
+   * Falls back to just the filename when the file has no parent directory.
+   */
+  skillIdentity: string;
+
+  /** The shared filename (basename only, e.g. "SKILL.md"). */
   filename: string;
 
   /** All files in this cluster. At least two entries. */
