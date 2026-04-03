@@ -1,0 +1,26 @@
+{
+  "batchId": "all-issues-20260403",
+  "tasks": [
+    {"taskId": "#1", "title": "Initialize Next.js project", "status": "pending", "issueNumber": 1, "prNumber": null},
+    {"taskId": "#2", "title": "Define core TypeScript types", "status": "pending", "issueNumber": 2, "prNumber": null},
+    {"taskId": "#3", "title": "Project discovery", "status": "pending", "issueNumber": 3, "prNumber": null},
+    {"taskId": "#4", "title": "File parser", "status": "pending", "issueNumber": 4, "prNumber": null},
+    {"taskId": "#5", "title": "Filesystem scanner", "status": "pending", "issueNumber": 5, "prNumber": null},
+    {"taskId": "#6", "title": "API route", "status": "pending", "issueNumber": 6, "prNumber": null},
+    {"taskId": "#7", "title": "Inventory table", "status": "pending", "issueNumber": 7, "prNumber": null},
+    {"taskId": "#8", "title": "Open in Editor", "status": "pending", "issueNumber": 8, "prNumber": null},
+    {"taskId": "#9", "title": "Detail panel", "status": "pending", "issueNumber": 9, "prNumber": null},
+    {"taskId": "#10", "title": "Overlap analyzer", "status": "pending", "issueNumber": 10, "prNumber": null},
+    {"taskId": "#11", "title": "Diff view", "status": "pending", "issueNumber": 11, "prNumber": null},
+    {"taskId": "#12", "title": "Overlaps page", "status": "pending", "issueNumber": 12, "prNumber": null},
+    {"taskId": "#13", "title": "Gap analyzer", "status": "pending", "issueNumber": 13, "prNumber": null},
+    {"taskId": "#14", "title": "Contradiction analyzer", "status": "pending", "issueNumber": 14, "prNumber": null},
+    {"taskId": "#15", "title": "Insights page", "status": "pending", "issueNumber": 15, "prNumber": null},
+    {"taskId": "#16", "title": "Project sidebar", "status": "pending", "issueNumber": 16, "prNumber": null},
+    {"taskId": "#17", "title": "CLAUDE.md viewer", "status": "pending", "issueNumber": 17, "prNumber": null},
+    {"taskId": "#18", "title": "Additional scan paths", "status": "pending", "issueNumber": 18, "prNumber": null},
+    {"taskId": "#19", "title": "App navigation", "status": "pending", "issueNumber": 19, "prNumber": null}
+  ],
+  "currentIndex": 0,
+  "startedAt": "2026-04-03T10:00:00Z"
+}
