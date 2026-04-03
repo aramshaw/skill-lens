@@ -58,6 +58,34 @@ export interface Project {
 }
 
 /**
+ * A cluster of SkillFiles that share the same filename across different locations.
+ *
+ * Singletons (skills that exist in only one location) are excluded — a cluster
+ * must contain at least two files.
+ */
+export interface OverlapCluster {
+  /** The shared filename (e.g. "save.md" or "SKILL.md"). */
+  filename: string;
+
+  /** All files in this cluster. At least two entries. */
+  files: SkillFile[];
+
+  /**
+   * Whether every file in the cluster has the same content:
+   * - `identical` — all files share the same content hash (exact duplicates)
+   * - `drifted`   — at least two files have different content hashes (diverged copies)
+   */
+  status: 'identical' | 'drifted';
+
+  /**
+   * Files grouped by content hash.
+   * Using Record instead of Map so the value is directly JSON-serializable.
+   * Each key is a content hash; each value is the list of files sharing that hash.
+   */
+  hashGroups: Record<string, SkillFile[]>;
+}
+
+/**
  * The complete output of a single scan run.
  */
 export interface ScanResult {
