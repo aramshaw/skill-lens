@@ -33,6 +33,12 @@ export interface SkillFile {
   /** Absolute path to the owning project root, or null for user-level / plugin files. */
   projectPath: string | null;
 
+  /**
+   * Name of the plugin this file belongs to (the directory name under ~/.claude/plugins/),
+   * or null for user-level and project-level files.
+   */
+  pluginName: string | null;
+
   /** Raw YAML frontmatter parsed from the file (all fields). */
   frontmatter: Record<string, unknown>;
 

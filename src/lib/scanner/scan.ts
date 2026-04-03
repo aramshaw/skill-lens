@@ -53,10 +53,11 @@ function safeParse(
   filePath: string,
   level: SkillFile['level'],
   projectName: string | null,
-  projectPath: string | null
+  projectPath: string | null,
+  pluginName: string | null = null
 ): SkillFile | null {
   try {
-    return parseSkillFile(filePath, level, projectName, projectPath);
+    return parseSkillFile(filePath, level, projectName, projectPath, pluginName);
   } catch {
     return null;
   }
@@ -135,13 +136,13 @@ async function scanPluginLevel(homeDir: string): Promise<SkillFile[]> {
     return [];
   }
 
-  const pluginDirs = entries
+  const pluginEntries = entries
     .filter((e) => e.isDirectory())
-    .map((e) => path.join(pluginsDir, e.name).replace(/\\/g, '/'));
+    .map((e) => ({ name: e.name, dir: path.join(pluginsDir, e.name).replace(/\\/g, '/') }));
 
   const skills: SkillFile[] = [];
 
-  for (const pluginDir of pluginDirs) {
+  for (const { name: pluginName, dir: pluginDir } of pluginEntries) {
     // Plugins may keep skills/agents directly in root or under .claude/ subdirs
     const patterns = [
       `${pluginDir}/**/*.md`,
@@ -149,7 +150,7 @@ async function scanPluginLevel(homeDir: string): Promise<SkillFile[]> {
 
     const filePaths = await safeGlob(patterns);
     for (const filePath of filePaths) {
-      const parsed = safeParse(filePath, 'plugin', null, null);
+      const parsed = safeParse(filePath, 'plugin', null, null, pluginName);
       if (parsed) {
         skills.push(parsed);
       }

@@ -9,7 +9,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { DiffView } from "@/components/diff-view";
-import type { OverlapCluster, SkillFile } from "@/lib/types";
+import { locationLabel } from "@/lib/overlaps-utils";
+import type { OverlapCluster } from "@/lib/types";
 import type { AnalyzeResponse, AnalyzeErrorResponse } from "@/app/api/analyze/route";
 
 // ---------------------------------------------------------------------------
@@ -40,16 +41,6 @@ function StatusBadge({ status }: { status: OverlapCluster["status"] }) {
       identical
     </span>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Location label for a single SkillFile
-// ---------------------------------------------------------------------------
-
-function locationLabel(skill: SkillFile): string {
-  if (skill.level === "user") return "~/.claude (user)";
-  if (skill.level === "plugin") return "plugin";
-  return skill.projectName ?? skill.filePath;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,27 +82,34 @@ function ClusterCard({ cluster, onOpenDiff }: ClusterCardProps) {
         </p>
 
         {/* Location list */}
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-1.5">
           {cluster.files.map((file) => (
             <li
               key={file.filePath}
-              className="flex items-center gap-2 text-xs"
+              className="flex flex-col gap-0.5"
               title={file.filePath}
             >
-              {/* Level badge */}
-              <span
-                className={
-                  file.level === "user"
-                    ? "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 shrink-0"
-                    : file.level === "plugin"
-                      ? "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 shrink-0"
-                      : "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shrink-0"
-                }
-              >
-                {file.level}
-              </span>
-              <span className="truncate text-muted-foreground font-mono">
-                {locationLabel(file)}
+              <div className="flex items-center gap-1.5">
+                {/* Level badge */}
+                <span
+                  className={
+                    file.level === "user"
+                      ? "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 shrink-0"
+                      : file.level === "plugin"
+                        ? "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 shrink-0"
+                        : "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shrink-0"
+                  }
+                >
+                  {file.level}
+                </span>
+                {/* Source name — project/plugin/user identifier */}
+                <span className="text-xs font-medium text-foreground truncate">
+                  {locationLabel(file)}
+                </span>
+              </div>
+              {/* File path — shown in muted mono below the source name */}
+              <span className="text-[10px] font-mono text-muted-foreground truncate pl-0.5">
+                {file.filePath}
               </span>
             </li>
           ))}

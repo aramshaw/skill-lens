@@ -31,6 +31,7 @@ function makeSkillFile(overrides: Partial<SkillFile> & { filePath: string }): Sk
     level: 'project',
     projectName: `project-${_idCounter}`,
     projectPath: `/repos/project-${_idCounter}`,
+    pluginName: null,
     frontmatter: {},
     body: 'body',
     contentHash: `hash-${_idCounter}`,

@@ -11,6 +11,7 @@
 
 import * as React from "react";
 import { diffLines } from "diff";
+import { locationLabel } from "@/lib/overlaps-utils";
 import type { SkillFile } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -137,8 +138,7 @@ function DiffPanel({
     return "text-foreground";
   }
 
-  const displayProject =
-    skill.projectName ?? (skill.level === "user" ? "~/.claude (user)" : "plugin");
+  const displayProject = locationLabel(skill);
 
   return (
     <div className="flex flex-col flex-1 min-w-0 overflow-hidden border border-border rounded-lg">
@@ -225,8 +225,7 @@ function FileSelector({
       >
         {files.map((file, i) => (
           <option key={file.filePath} value={i}>
-            {file.projectName ?? (file.level === "user" ? "~/.claude (user)" : "plugin")} —{" "}
-            {file.filePath.split(/[\\/]/).pop() ?? file.filePath}
+            {locationLabel(file)} — {file.filePath.split(/[\\/]/).pop() ?? file.filePath}
           </option>
         ))}
       </select>
