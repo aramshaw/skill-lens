@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Card,
   CardHeader,
@@ -16,6 +17,7 @@ import {
   sortClusters,
   shouldShowDiff,
 } from "@/lib/overlaps-filter";
+import { parseSearchParam } from "@/lib/cross-page-nav";
 import type { LevelFilter } from "@/lib/overlaps-filter";
 import type { OverlapCluster } from "@/lib/types";
 import type { AnalyzeResponse, AnalyzeErrorResponse } from "@/app/api/analyze/route";
@@ -205,10 +207,12 @@ function DiffModal({ cluster, onClose }: DiffModalProps) {
 // ---------------------------------------------------------------------------
 
 export default function OverlapsPage() {
+  const searchParams = useSearchParams();
+  const initialSearch = parseSearchParam(searchParams.get("search"));
   const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [levelFilter, setLevelFilter] = React.useState<LevelFilter>("all");
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState(initialSearch);
   const [activeDiff, setActiveDiff] = React.useState<OverlapCluster | null>(null);
 
   React.useEffect(() => {

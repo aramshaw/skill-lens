@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Card,
   CardHeader,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { DiffView } from "@/components/diff-view";
 import { skillIdentityKey } from "@/lib/analyzer/overlaps";
+import { buildInventorySearchUrl } from "@/lib/cross-page-nav";
 import type { GapFlag, ContradictionFlag, SkillFile, OverlapCluster } from "@/lib/types";
 import type { AnalyzeResponse, AnalyzeErrorResponse } from "@/app/api/analyze/route";
 
@@ -111,9 +113,9 @@ function GapCard({ gap, allFiles }: GapCardProps) {
           </ul>
         </div>
 
-        {/* Action hint */}
-        {existingFile && (
-          <div className="pt-1">
+        {/* Action row — Open in Editor + View in Inventory */}
+        <div className="pt-1 flex flex-wrap items-center gap-2">
+          {existingFile && (
             <button
               onClick={handleOpen}
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/60 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
@@ -121,8 +123,14 @@ function GapCard({ gap, allFiles }: GapCardProps) {
             >
               Open in Editor
             </button>
-          </div>
-        )}
+          )}
+          <Link
+            href={buildInventorySearchUrl(gap.skillName)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/60 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            View in inventory
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
@@ -213,17 +221,23 @@ function ContradictionCard({ contradiction, allFiles, onViewDiff }: Contradictio
           ))}
         </ul>
 
-        {/* View diff button */}
-        {involvedFiles.length >= 2 && (
-          <div className="pt-1">
+        {/* Action row — View diff + View in Inventory */}
+        <div className="pt-1 flex flex-wrap items-center gap-2">
+          {involvedFiles.length >= 2 && (
             <button
               onClick={handleViewDiff}
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/60 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
             >
               View diff
             </button>
-          </div>
-        )}
+          )}
+          <Link
+            href={buildInventorySearchUrl(contradiction.skillName)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/60 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            View in inventory
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
