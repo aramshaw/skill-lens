@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { InventoryTable } from "@/components/inventory-table";
+import { ProjectSidebar } from "@/components/project-sidebar";
+import type { ProjectFilter } from "@/components/project-sidebar";
 import type { SkillFile } from "@/lib/types";
 import type { ScanResponse, ScanErrorResponse } from "@/app/api/scan/route";
 
@@ -12,6 +14,7 @@ type ScanState =
 
 export default function Home() {
   const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
+  const [projectFilter, setProjectFilter] = React.useState<ProjectFilter>(null);
 
   React.useEffect(() => {
     async function runScan() {
@@ -96,7 +99,20 @@ export default function Home() {
                   directory.
                 </div>
               ) : (
-                <InventoryTable skills={scan.skills} />
+                /* Sidebar + table layout */
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <ProjectSidebar
+                    skills={scan.skills}
+                    activeFilter={projectFilter}
+                    onFilterChange={setProjectFilter}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <InventoryTable
+                      skills={scan.skills}
+                      projectFilter={projectFilter}
+                    />
+                  </div>
+                </div>
               )}
             </>
           )}

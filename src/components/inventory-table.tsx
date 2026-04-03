@@ -10,6 +10,14 @@ import { SkillDetailPanel } from "./skill-detail-panel";
 
 interface InventoryTableProps {
   skills: SkillFile[];
+  /**
+   * Optional project filter from the sidebar.
+   * - `null` or `undefined` — show all skills
+   * - `"__user__"` — show only user-level skills
+   * - `"__plugin__"` — show only plugin-level skills
+   * - any other string — show only skills from that project
+   */
+  projectFilter?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +64,7 @@ function sortSkills(
 // Component
 // ---------------------------------------------------------------------------
 
-export function InventoryTable({ skills }: InventoryTableProps) {
+export function InventoryTable({ skills, projectFilter }: InventoryTableProps) {
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<string>("all");
   const [levelFilter, setLevelFilter] = React.useState<string>("all");
@@ -65,17 +73,20 @@ export function InventoryTable({ skills }: InventoryTableProps) {
   const [selected, setSelected] = React.useState<SkillFile | null>(null);
 
   // Derived unique filter options
-  const projects = React.useMemo(() => {
-    const names = skills
-      .map((s) => s.projectName)
-      .filter((n): n is string => n !== null);
-    return Array.from(new Set(names)).sort();
-  }, [skills]);
-  void projects; // available for future project filter
-
   // Filtered + sorted
   const filtered = React.useMemo(() => {
     let result = skills;
+
+    // Project sidebar filter
+    if (projectFilter != null) {
+      if (projectFilter === "__user__") {
+        result = result.filter((s) => s.level === "user");
+      } else if (projectFilter === "__plugin__") {
+        result = result.filter((s) => s.level === "plugin");
+      } else {
+        result = result.filter((s) => s.projectName === projectFilter);
+      }
+    }
 
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -95,7 +106,7 @@ export function InventoryTable({ skills }: InventoryTableProps) {
     }
 
     return sortSkills(result, sortKey, sortDir);
-  }, [skills, search, typeFilter, levelFilter, sortKey, sortDir]);
+  }, [skills, projectFilter, search, typeFilter, levelFilter, sortKey, sortDir]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
