@@ -6,8 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { InventoryTable } from "@/components/inventory-table";
 import { ProjectSidebar } from "@/components/project-sidebar";
 import { ClaudeMdViewer } from "@/components/claude-md-viewer";
-import { SettingsPanel } from "@/components/settings-panel";
-import { loadAdditionalPaths } from "@/lib/storage";
+import { useAdditionalPaths } from "@/lib/hooks/use-additional-paths";
 import { useScanContext } from "@/components/scan-context";
 import { parseSearchParam } from "@/lib/cross-page-nav";
 import type { ProjectFilter } from "@/components/project-sidebar";
@@ -71,13 +70,7 @@ export default function Home() {
   const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [projectFilter, setProjectFilter] = React.useState<ProjectFilter>(null);
-  const [additionalPaths, setAdditionalPaths] = React.useState<string[]>([]);
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
-
-  // Load additional paths from localStorage on mount
-  React.useEffect(() => {
-    setAdditionalPaths(loadAdditionalPaths());
-  }, []);
+  const { paths: additionalPaths } = useAdditionalPaths();
 
   // Stable ref so the rescan callback passed to registerScan always calls
   // the current version of runScan without self-referential dependency issues.
@@ -174,19 +167,8 @@ export default function Home() {
     void runScan(additionalPaths);
   }, [additionalPaths, runScan]);
 
-  function handlePathsChange(paths: string[]) {
-    setAdditionalPaths(paths);
-  }
-
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)] bg-background">
-      {/* Settings panel */}
-      <SettingsPanel
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        onPathsChange={handlePathsChange}
-      />
-
       {/* Main content */}
       <main className="flex-1 px-6 py-6">
         <div className="max-w-7xl mx-auto flex flex-col gap-6">
@@ -245,12 +227,12 @@ export default function Home() {
                   {scan.skills.length !== 1 ? "s" : ""} scanned in{" "}
                   {scan.durationMs}ms
                 </p>
-                <button
-                  onClick={() => setSettingsOpen(true)}
+                <Link
+                  href="/settings"
                   className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   Manage scan paths
-                </button>
+                </Link>
               </div>
 
               {scan.skills.length === 0 ? (
