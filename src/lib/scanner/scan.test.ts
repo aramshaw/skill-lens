@@ -52,6 +52,7 @@ function makeSkillFile(overrides: Partial<SkillFile> = {}): SkillFile {
     level: 'user',
     projectName: null,
     projectPath: null,
+    pluginName: null,
     frontmatter: {},
     body: 'body',
     contentHash: 'abc123',
@@ -182,7 +183,8 @@ describe('scanAll — project-level scanning', () => {
       '/repos/my-app/.claude/skills/cool-skill/SKILL.md',
       'project',
       'my-app',
-      '/repos/my-app'
+      '/repos/my-app',
+      null
     );
   });
 });
@@ -236,6 +238,7 @@ describe('scanAll — user-level scanning', () => {
       '/home/testuser/.claude/skills/my-skill/SKILL.md',
       'user',
       null,
+      null,
       null
     );
   });
@@ -273,6 +276,7 @@ describe('scanAll — plugin-level scanning', () => {
     const pluginFile = makeSkillFile({
       filePath: '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
       level: 'plugin',
+      pluginName: 'my-plugin',
     });
 
     // Return the plugin file only when the pattern includes "plugins", empty otherwise
@@ -290,6 +294,39 @@ describe('scanAll — plugin-level scanning', () => {
 
     expect(result.pluginSkills).toHaveLength(1);
     expect(result.pluginSkills[0].level).toBe('plugin');
+  });
+
+  it('calls parseSkillFile with pluginName derived from parent directory (AC4)', async () => {
+    mockFs.existsSync.mockReturnValue(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockFs.readdirSync.mockReturnValue([{ name: 'my-plugin', isDirectory: () => true }] as any);
+
+    const pluginFile = makeSkillFile({
+      filePath: '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
+      level: 'plugin',
+      pluginName: 'my-plugin',
+    });
+
+    mockFg.mockImplementation(async (patterns: string | string[]) => {
+      const patternList = Array.isArray(patterns) ? patterns : [patterns];
+      if (patternList.some((p) => p.includes('plugins'))) {
+        return ['/home/testuser/.claude/plugins/my-plugin/SKILL.md'];
+      }
+      return [];
+    });
+
+    mockParseSkillFile.mockReturnValue(pluginFile);
+
+    await scanAll([]);
+
+    // Should call parseSkillFile with the plugin name
+    expect(mockParseSkillFile).toHaveBeenCalledWith(
+      '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
+      'plugin',
+      null,
+      null,
+      'my-plugin'
+    );
   });
 
   it('skips plugin scanning when ~/.claude/plugins does not exist', async () => {

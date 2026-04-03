@@ -34,6 +34,7 @@ function makeSkillFile(
     level: 'project',
     projectName: `project-${_idCounter}`,
     projectPath: `/repos/project-${_idCounter}`,
+    pluginName: null,
     frontmatter,
     body: 'body',
     contentHash: `hash-${_idCounter}`,

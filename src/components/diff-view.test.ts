@@ -25,6 +25,7 @@ function makeSkill(overrides: Partial<SkillFile>): SkillFile {
     level: 'user',
     projectName: null,
     projectPath: null,
+    pluginName: null,
     frontmatter: { name: 'Test Skill', description: 'A test skill' },
     body: '# Test Skill\n\nThis is the body.',
     contentHash: 'abc123',

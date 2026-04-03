@@ -58,12 +58,14 @@ function deriveName(filePath: string): string {
  * @param level       Scope level: 'user' | 'project' | 'plugin'.
  * @param projectName Optional name of the owning project.
  * @param projectPath Optional absolute path to the owning project root.
+ * @param pluginName  Optional name of the plugin (directory name under ~/.claude/plugins/).
  */
 export function parseSkillFile(
   filePath: string,
   level: SkillFile['level'],
   projectName: string | null = null,
-  projectPath: string | null = null
+  projectPath: string | null = null,
+  pluginName: string | null = null
 ): SkillFile {
   // 1. Read file content
   const raw = fs.readFileSync(filePath, 'utf-8');
@@ -106,6 +108,7 @@ export function parseSkillFile(
     level,
     projectName,
     projectPath,
+    pluginName,
     frontmatter,
     body,
     contentHash,

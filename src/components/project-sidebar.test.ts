@@ -30,6 +30,7 @@ function makeSkill(overrides: Partial<SkillFile>): SkillFile {
     level: 'project',
     projectName: 'my-app',
     projectPath: '/repos/my-app',
+    pluginName: null,
     frontmatter: {},
     body: '',
     contentHash: 'abc123',
