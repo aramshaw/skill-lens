@@ -86,6 +86,35 @@ export interface OverlapCluster {
 }
 
 /**
+ * A gap flag — a skill that exists in some projects but is missing from others.
+ *
+ * Only generated for skills whose filename appears in at least 50% of the known
+ * projects (the "common enough to matter" threshold). User-level skills are
+ * excluded because they are available everywhere.
+ */
+export interface GapFlag {
+  /** The shared filename (e.g. "lint.md" or "SKILL.md"). */
+  skillName: string;
+
+  /**
+   * Projects that DO have this skill, with their level.
+   * Only project-level and plugin-level files are included here
+   * (user-level files are excluded from gap analysis).
+   */
+  presentIn: { projectName: string; level: string }[];
+
+  /** Projects that do NOT have a file with this filename. */
+  missingFrom: { projectName: string }[];
+
+  /**
+   * Human-readable coverage summary, e.g. "3 of 5 projects".
+   * Numerator = number of projects with the skill.
+   * Denominator = total number of known projects.
+   */
+  coverage: string;
+}
+
+/**
  * The complete output of a single scan run.
  */
 export interface ScanResult {
