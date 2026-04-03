@@ -254,6 +254,7 @@ export default function Home() {
                 <div className="flex flex-col md:flex-row gap-6 items-start">
                   <ProjectSidebar
                     skills={scan.skills}
+                    projects={scan.projects}
                     activeFilter={projectFilter}
                     onFilterChange={setProjectFilter}
                   />

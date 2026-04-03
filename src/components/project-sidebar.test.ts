@@ -1,18 +1,20 @@
 /**
- * Unit tests for ProjectSidebar utility logic (computeProjectCounts)
+ * Unit tests for ProjectSidebar utility logic (computeProjectCounts, computeProjectCountsWithAllProjects)
  *
  * AC1: "Sidebar lists all projects with counts" → unit (pure count computation)
  * AC2: "Clicking filters the inventory table" → e2e (browser interaction — deferred)
  * AC3: "All Projects clears filter" → e2e (browser interaction — deferred)
  * AC4: "Active filter visually indicated" → e2e (visual rendering — deferred)
  * AC5: "Responsive on narrow screens" → e2e (visual rendering — deferred)
+ * AC6: "Projects with 0 skill files appear in sidebar with count 0" → unit (pure count computation)
  *
- * We unit-test the pure logic: computeProjectCounts, which derives sidebar entries
- * from a flat list of SkillFiles. Browser interaction tests are covered by e2e.
+ * We unit-test the pure logic: computeProjectCounts and computeProjectCountsWithAllProjects,
+ * which derive sidebar entries from a flat list of SkillFiles and an optional full Project list.
+ * Browser interaction tests are covered by e2e.
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeProjectCounts } from './project-sidebar';
+import { computeProjectCounts, computeProjectCountsWithAllProjects } from './project-sidebar';
 import type { SkillFile } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -131,5 +133,96 @@ describe('computeProjectCounts — total', () => {
     ];
     const result = computeProjectCounts(skills);
     expect(result.total).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeProjectCountsWithAllProjects — AC6: projects with 0 skills appear
+// ---------------------------------------------------------------------------
+
+function makeProject(overrides: Partial<{ name: string; path: string }> = {}): { name: string; path: string } {
+  return {
+    name: 'my-project',
+    path: '/repos/my-project',
+    ...overrides,
+  };
+}
+
+describe('computeProjectCountsWithAllProjects — projects with 0 skills', () => {
+  it('includes projects with 0 skill files when a full project list is provided', () => {
+    const projects = [
+      makeProject({ name: 'has-skills', path: '/repos/has-skills' }),
+      makeProject({ name: 'empty-project', path: '/repos/empty-project' }),
+    ];
+    const skills = [
+      makeSkill({ projectName: 'has-skills', level: 'project' }),
+    ];
+    const result = computeProjectCountsWithAllProjects(skills, projects);
+    expect(result.projects).toHaveLength(2);
+    const emptyProj = result.projects.find((p) => p.name === 'empty-project');
+    expect(emptyProj).toBeDefined();
+    expect(emptyProj?.count).toBe(0);
+  });
+
+  it('shows correct count for projects that do have skills', () => {
+    const projects = [
+      makeProject({ name: 'has-skills', path: '/repos/has-skills' }),
+      makeProject({ name: 'empty-project', path: '/repos/empty-project' }),
+    ];
+    const skills = [
+      makeSkill({ projectName: 'has-skills', level: 'project' }),
+      makeSkill({ projectName: 'has-skills', level: 'project' }),
+    ];
+    const result = computeProjectCountsWithAllProjects(skills, projects);
+    const proj = result.projects.find((p) => p.name === 'has-skills');
+    expect(proj?.count).toBe(2);
+  });
+
+  it('sorts projects alphabetically including empty ones', () => {
+    const projects = [
+      makeProject({ name: 'zebra' }),
+      makeProject({ name: 'alpha' }),
+      makeProject({ name: 'middle' }),
+    ];
+    const result = computeProjectCountsWithAllProjects([], projects);
+    const names = result.projects.map((p) => p.name);
+    expect(names).toEqual(['alpha', 'middle', 'zebra']);
+  });
+
+  it('merges projects from skill files not in the explicit project list', () => {
+    // A skill references a project not in the Project[] list — should still appear
+    const projects = [makeProject({ name: 'known-project' })];
+    const skills = [
+      makeSkill({ projectName: 'known-project', level: 'project' }),
+      makeSkill({ projectName: 'orphan-project', level: 'project' }),
+    ];
+    const result = computeProjectCountsWithAllProjects(skills, projects);
+    const names = result.projects.map((p) => p.name);
+    expect(names).toContain('known-project');
+    expect(names).toContain('orphan-project');
+  });
+
+  it('falls back to skill-derived counts when no project list is passed', () => {
+    const skills = [
+      makeSkill({ projectName: 'proj-a', level: 'project' }),
+    ];
+    // Same behaviour as computeProjectCounts when projects is empty/undefined
+    const result = computeProjectCountsWithAllProjects(skills, []);
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0].name).toBe('proj-a');
+  });
+
+  it('includes all three projects even when only one has skills', () => {
+    const projects = [
+      makeProject({ name: 'proj-a' }),
+      makeProject({ name: 'proj-b' }),
+      makeProject({ name: 'proj-c' }),
+    ];
+    const skills = [makeSkill({ projectName: 'proj-b', level: 'project' })];
+    const result = computeProjectCountsWithAllProjects(skills, projects);
+    expect(result.projects).toHaveLength(3);
+    expect(result.projects.find((p) => p.name === 'proj-a')?.count).toBe(0);
+    expect(result.projects.find((p) => p.name === 'proj-b')?.count).toBe(1);
+    expect(result.projects.find((p) => p.name === 'proj-c')?.count).toBe(0);
   });
 });
