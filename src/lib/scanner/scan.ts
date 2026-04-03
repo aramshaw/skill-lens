@@ -118,8 +118,91 @@ async function scanUserLevel(homeDir: string): Promise<SkillFile[]> {
 }
 
 /**
- * Scan plugin-level directories (~/.claude/plugins/<plugin-name>/).
- * Each subdirectory under ~/.claude/plugins/ is treated as a plugin.
+ * Structure of an entry in the installed_plugins.json `plugins` record.
+ * Each plugin key maps to an array of install locations.
+ */
+interface InstalledPluginEntry {
+  scope: string;
+  installPath: string;
+}
+
+/**
+ * Read and parse ~/.claude/plugins/installed_plugins.json.
+ *
+ * Returns an array of { pluginName, installPath } tuples for every installed
+ * plugin location listed in the file. Returns an empty array on any error
+ * (missing file, malformed JSON, unexpected structure).
+ */
+function readInstalledPlugins(
+  pluginsDir: string
+): Array<{ pluginName: string; installPath: string }> {
+  const jsonPath = path.join(pluginsDir, 'installed_plugins.json');
+
+  if (!fs.existsSync(jsonPath)) {
+    return [];
+  }
+
+  let raw: string;
+  try {
+    raw = fs.readFileSync(jsonPath, 'utf-8') as string;
+  } catch {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('plugins' in parsed) ||
+    typeof (parsed as Record<string, unknown>).plugins !== 'object' ||
+    Array.isArray((parsed as Record<string, unknown>).plugins) ||
+    (parsed as Record<string, unknown>).plugins === null
+  ) {
+    return [];
+  }
+
+  const pluginsMap = (parsed as Record<string, unknown>).plugins as Record<string, unknown>;
+  const result: Array<{ pluginName: string; installPath: string }> = [];
+
+  for (const [key, entries] of Object.entries(pluginsMap)) {
+    // Derive a human-readable plugin name from the key.
+    // Key format: "plugin-name@registry" or just "plugin-name".
+    const pluginName = key.includes('@') ? key.split('@')[0] : key;
+
+    if (!Array.isArray(entries)) {
+      continue;
+    }
+
+    for (const entry of entries as InstalledPluginEntry[]) {
+      if (typeof entry?.installPath === 'string' && entry.installPath.length > 0) {
+        // Normalise to forward slashes for cross-platform compat
+        result.push({ pluginName, installPath: entry.installPath.replace(/\\/g, '/') });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Scan plugin-level directories using ~/.claude/plugins/installed_plugins.json
+ * as the authoritative list of installed plugins.
+ *
+ * Only the specific installPath directories listed in installed_plugins.json are
+ * scanned — not the entire plugins directory tree. This avoids scanning cache
+ * directories, marketplace catalogs, and temp files.
+ *
+ * Gracefully returns an empty array when:
+ * - The plugins directory doesn't exist
+ * - installed_plugins.json is missing or unreadable
+ * - The JSON is malformed or has an unexpected structure
+ * - The plugins list is empty
  */
 async function scanPluginLevel(homeDir: string): Promise<SkillFile[]> {
   const pluginsDir = path.join(homeDir, '.claude', 'plugins').replace(/\\/g, '/');
@@ -128,27 +211,19 @@ async function scanPluginLevel(homeDir: string): Promise<SkillFile[]> {
     return [];
   }
 
-  // Read subdirectories — each is a plugin
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(pluginsDir, { withFileTypes: true }) as fs.Dirent[];
-  } catch {
+  const installedPlugins = readInstalledPlugins(pluginsDir);
+
+  if (installedPlugins.length === 0) {
     return [];
   }
 
-  const pluginEntries = entries
-    .filter((e) => e.isDirectory())
-    .map((e) => ({ name: e.name, dir: path.join(pluginsDir, e.name).replace(/\\/g, '/') }));
-
   const skills: SkillFile[] = [];
 
-  for (const { name: pluginName, dir: pluginDir } of pluginEntries) {
-    // Plugins may keep skills/agents directly in root or under .claude/ subdirs
-    const patterns = [
-      `${pluginDir}/**/*.md`,
-    ];
-
+  for (const { pluginName, installPath } of installedPlugins) {
+    // Scan all markdown files under the plugin's specific install directory
+    const patterns = [`${installPath}/**/*.md`];
     const filePaths = await safeGlob(patterns);
+
     for (const filePath of filePaths) {
       const parsed = safeParse(filePath, 'plugin', null, null, pluginName);
       if (parsed) {

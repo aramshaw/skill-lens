@@ -244,108 +244,322 @@ describe('scanAll — user-level scanning', () => {
   });
 });
 
-describe('scanAll — plugin-level scanning', () => {
-  it('scans ~/.claude/plugins/ directory', async () => {
-    // Simulate plugin directory existing with a subdirectory
-    mockFs.existsSync.mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockFs.readdirSync.mockReturnValue([{ name: 'my-plugin', isDirectory: () => true }] as any);
+// ---------------------------------------------------------------------------
+// Helpers for installed_plugins.json mocking
+// ---------------------------------------------------------------------------
 
+/**
+ * Build the JSON string for installed_plugins.json with the given plugin entries.
+ * Each entry is { key: string, installPath: string }.
+ */
+function makeInstalledPluginsJson(
+  plugins: Array<{ key: string; installPath: string }>,
+  version = 2
+): string {
+  const pluginsObj: Record<string, Array<{ scope: string; installPath: string }>> = {};
+  for (const { key, installPath } of plugins) {
+    pluginsObj[key] = [{ scope: 'user', installPath }];
+  }
+  return JSON.stringify({ version, plugins: pluginsObj });
+}
+
+// ---------------------------------------------------------------------------
+// AC1-AC5: Plugin-level scanning via installed_plugins.json
+// ---------------------------------------------------------------------------
+
+describe('scanAll — plugin-level scanning (installed_plugins.json)', () => {
+  // AC1: reads installed_plugins.json
+  it('reads installed_plugins.json to determine which plugins to scan', async () => {
+    const installPath = '/home/testuser/.claude/plugins/cache/official/vercel/abc123';
+    const jsonContent = makeInstalledPluginsJson([
+      { key: 'vercel@claude-plugins-official', installPath },
+    ]);
+
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
     mockFg.mockResolvedValue([]);
 
     await scanAll([]);
 
-    // Should have attempted to scan the plugin directory
     const calls = mockFg.mock.calls;
     const allPatterns = calls.flatMap(([patterns]) =>
       Array.isArray(patterns) ? patterns : [patterns]
     );
 
-    const hasPlugins = allPatterns.some(
-      (p) => typeof p === 'string' && p.includes('plugins')
+    // The installPath should appear in glob patterns
+    const hasInstallPath = allPatterns.some(
+      (p) => typeof p === 'string' && p.includes('abc123')
+    );
+    expect(hasInstallPath).toBe(true);
+  });
+
+  // AC2: only installed directories are scanned
+  it('does not glob the entire plugins directory — only installPath dirs', async () => {
+    const installPath = '/home/testuser/.claude/plugins/cache/official/vercel/abc123';
+    const jsonContent = makeInstalledPluginsJson([
+      { key: 'vercel@claude-plugins-official', installPath },
+    ]);
+
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
+    mockFg.mockResolvedValue([]);
+
+    await scanAll([]);
+
+    const calls = mockFg.mock.calls;
+    const allPatterns = calls.flatMap(([patterns]) =>
+      Array.isArray(patterns) ? patterns : [patterns]
     );
 
-    expect(hasPlugins).toBe(true);
+    // Should NOT glob a wildcard over the top-level plugins dir
+    const hasBroadPluginGlob = allPatterns.some(
+      (p) =>
+        typeof p === 'string' &&
+        p.includes('plugins') &&
+        !p.includes('abc123') &&
+        !p.includes('installed_plugins')
+    );
+    expect(hasBroadPluginGlob).toBe(false);
+  });
+
+  // AC3: plugin name derived from JSON key (the part before @)
+  it('derives plugin name from the JSON key (e.g. "vercel" from "vercel@claude-plugins-official")', async () => {
+    const installPath = '/home/testuser/.claude/plugins/cache/official/vercel/abc123';
+    const jsonContent = makeInstalledPluginsJson([
+      { key: 'vercel@claude-plugins-official', installPath },
+    ]);
+
+    const pluginFile = makeSkillFile({
+      filePath: `${installPath}/SKILL.md`,
+      level: 'plugin',
+      pluginName: 'vercel',
+    });
+
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
+    mockFg.mockImplementation(async (patterns: string | string[]) => {
+      const patternList = Array.isArray(patterns) ? patterns : [patterns];
+      if (patternList.some((p) => p.includes('abc123'))) {
+        return [`${installPath}/SKILL.md`];
+      }
+      return [];
+    });
+    mockParseSkillFile.mockReturnValue(pluginFile);
+
+    await scanAll([]);
+
+    expect(mockParseSkillFile).toHaveBeenCalledWith(
+      `${installPath}/SKILL.md`,
+      'plugin',
+      null,
+      null,
+      'vercel'
+    );
+  });
+
+  it('uses key name as-is when there is no @ separator', async () => {
+    const installPath = '/home/testuser/.claude/plugins/cache/myplugin/v1';
+    const jsonContent = JSON.stringify({
+      version: 2,
+      plugins: {
+        myplugin: [{ scope: 'user', installPath }],
+      },
+    });
+
+    const pluginFile = makeSkillFile({
+      filePath: `${installPath}/SKILL.md`,
+      level: 'plugin',
+      pluginName: 'myplugin',
+    });
+
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
+    mockFg.mockImplementation(async (patterns: string | string[]) => {
+      const patternList = Array.isArray(patterns) ? patterns : [patterns];
+      if (patternList.some((p) => p.includes('v1'))) {
+        return [`${installPath}/SKILL.md`];
+      }
+      return [];
+    });
+    mockParseSkillFile.mockReturnValue(pluginFile);
+
+    await scanAll([]);
+
+    expect(mockParseSkillFile).toHaveBeenCalledWith(
+      `${installPath}/SKILL.md`,
+      'plugin',
+      null,
+      null,
+      'myplugin'
+    );
   });
 
   it('populates pluginSkills with parsed SkillFiles at level=plugin', async () => {
-    mockFs.existsSync.mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockFs.readdirSync.mockReturnValue([{ name: 'my-plugin', isDirectory: () => true }] as any);
+    const installPath = '/home/testuser/.claude/plugins/cache/official/my-plugin/abc';
+    const jsonContent = makeInstalledPluginsJson([
+      { key: 'my-plugin@official', installPath },
+    ]);
 
     const pluginFile = makeSkillFile({
-      filePath: '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
+      filePath: `${installPath}/SKILL.md`,
       level: 'plugin',
       pluginName: 'my-plugin',
     });
 
-    // Return the plugin file only when the pattern includes "plugins", empty otherwise
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
     mockFg.mockImplementation(async (patterns: string | string[]) => {
       const patternList = Array.isArray(patterns) ? patterns : [patterns];
-      if (patternList.some((p) => p.includes('plugins'))) {
-        return ['/home/testuser/.claude/plugins/my-plugin/SKILL.md'];
+      if (patternList.some((p) => p.includes('abc'))) {
+        return [`${installPath}/SKILL.md`];
       }
       return [];
     });
-
     mockParseSkillFile.mockReturnValue(pluginFile);
 
     const result = await scanAll([]);
 
     expect(result.pluginSkills).toHaveLength(1);
     expect(result.pluginSkills[0].level).toBe('plugin');
+    expect(result.pluginSkills[0].pluginName).toBe('my-plugin');
   });
 
-  it('calls parseSkillFile with pluginName derived from parent directory (AC4)', async () => {
-    mockFs.existsSync.mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockFs.readdirSync.mockReturnValue([{ name: 'my-plugin', isDirectory: () => true }] as any);
+  // AC4: graceful fallback when installed_plugins.json is missing
+  it('returns empty pluginSkills when installed_plugins.json does not exist', async () => {
+    mockFs.existsSync.mockReturnValue(false);
+    mockFg.mockResolvedValue([]);
 
-    const pluginFile = makeSkillFile({
-      filePath: '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
+    const result = await scanAll([]);
+
+    expect(result.pluginSkills).toEqual([]);
+  });
+
+  // AC4: graceful fallback when installed_plugins.json is malformed JSON
+  it('returns empty pluginSkills when installed_plugins.json contains malformed JSON', async () => {
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue('{ this is not valid json !!!');
+    mockFg.mockResolvedValue([]);
+
+    const result = await scanAll([]);
+
+    expect(result.pluginSkills).toEqual([]);
+  });
+
+  // AC4: graceful fallback when installed_plugins.json has unexpected structure
+  it('returns empty pluginSkills when installed_plugins.json has no plugins field', async () => {
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({ version: 2 }));
+    mockFg.mockResolvedValue([]);
+
+    const result = await scanAll([]);
+
+    expect(result.pluginSkills).toEqual([]);
+  });
+
+  // AC4: graceful fallback when installed_plugins.json plugins field is not an object
+  it('returns empty pluginSkills when plugins field is not an object', async () => {
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({ version: 2, plugins: [] }));
+    mockFg.mockResolvedValue([]);
+
+    const result = await scanAll([]);
+
+    expect(result.pluginSkills).toEqual([]);
+  });
+
+  // AC4: graceful fallback when readFileSync throws
+  it('returns empty pluginSkills when readFileSync throws', async () => {
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockImplementation(() => {
+      throw new Error('EACCES: permission denied');
+    });
+    mockFg.mockResolvedValue([]);
+
+    const result = await scanAll([]);
+
+    expect(result.pluginSkills).toEqual([]);
+  });
+
+  // AC4: empty plugins list in JSON → scan nothing
+  it('returns empty pluginSkills when installed_plugins.json has empty plugins object', async () => {
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({ version: 2, plugins: {} }));
+    mockFg.mockResolvedValue([]);
+
+    const result = await scanAll([]);
+
+    expect(result.pluginSkills).toEqual([]);
+  });
+
+  // Multiple plugins: each gets its own installPath scanned
+  it('scans all installPath entries from installed_plugins.json', async () => {
+    const installPath1 = '/home/testuser/.claude/plugins/cache/official/vercel/abc';
+    const installPath2 = '/home/testuser/.claude/plugins/cache/official/feature-dev/xyz';
+    const jsonContent = makeInstalledPluginsJson([
+      { key: 'vercel@claude-plugins-official', installPath: installPath1 },
+      { key: 'feature-dev@claude-plugins-official', installPath: installPath2 },
+    ]);
+
+    const vercelFile = makeSkillFile({
+      filePath: `${installPath1}/SKILL.md`,
       level: 'plugin',
-      pluginName: 'my-plugin',
+      pluginName: 'vercel',
+    });
+    const featureDevFile = makeSkillFile({
+      filePath: `${installPath2}/SKILL.md`,
+      level: 'plugin',
+      pluginName: 'feature-dev',
     });
 
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
     mockFg.mockImplementation(async (patterns: string | string[]) => {
       const patternList = Array.isArray(patterns) ? patterns : [patterns];
-      if (patternList.some((p) => p.includes('plugins'))) {
-        return ['/home/testuser/.claude/plugins/my-plugin/SKILL.md'];
-      }
+      if (patternList.some((p) => p.includes('abc'))) return [`${installPath1}/SKILL.md`];
+      if (patternList.some((p) => p.includes('xyz'))) return [`${installPath2}/SKILL.md`];
       return [];
     });
+    mockParseSkillFile.mockImplementation((_fp, _level, _pn, _pp, pluginName) => {
+      if (pluginName === 'vercel') return vercelFile;
+      return featureDevFile;
+    });
 
-    mockParseSkillFile.mockReturnValue(pluginFile);
+    const result = await scanAll([]);
 
-    await scanAll([]);
-
-    // Should call parseSkillFile with the plugin name
-    expect(mockParseSkillFile).toHaveBeenCalledWith(
-      '/home/testuser/.claude/plugins/my-plugin/SKILL.md',
-      'plugin',
-      null,
-      null,
-      'my-plugin'
-    );
+    expect(result.pluginSkills).toHaveLength(2);
+    const names = result.pluginSkills.map((s) => s.pluginName).sort();
+    expect(names).toEqual(['feature-dev', 'vercel']);
   });
 
-  it('skips plugin scanning when ~/.claude/plugins does not exist', async () => {
-    mockFs.existsSync.mockReturnValue(false);
+  // A plugin entry with multiple installPaths (array length > 1) — scan all
+  it('scans multiple installPaths for a single plugin key', async () => {
+    const installPath1 = '/home/testuser/.claude/plugins/cache/official/vercel/abc';
+    const installPath2 = '/home/testuser/.claude/plugins/cache/official/vercel/def';
+    const jsonContent = JSON.stringify({
+      version: 2,
+      plugins: {
+        'vercel@official': [
+          { scope: 'user', installPath: installPath1 },
+          { scope: 'project', installPath: installPath2 },
+        ],
+      },
+    });
+
+    mockFs.existsSync.mockReturnValue(true);
+    mockFs.readFileSync.mockReturnValue(jsonContent);
     mockFg.mockResolvedValue([]);
 
     await scanAll([]);
 
-    // No error should be thrown
     const calls = mockFg.mock.calls;
     const allPatterns = calls.flatMap(([patterns]) =>
       Array.isArray(patterns) ? patterns : [patterns]
     );
 
-    const hasPlugins = allPatterns.some(
-      (p) => typeof p === 'string' && p.includes('plugins')
-    );
-
-    expect(hasPlugins).toBe(false);
+    const hasAbc = allPatterns.some((p) => typeof p === 'string' && p.includes('abc'));
+    const hasDef = allPatterns.some((p) => typeof p === 'string' && p.includes('def'));
+    expect(hasAbc).toBe(true);
+    expect(hasDef).toBe(true);
   });
 });
 
