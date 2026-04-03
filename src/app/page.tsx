@@ -1,17 +1,106 @@
-import { Button } from "@/components/ui/button";
+"use client";
+
+import * as React from "react";
+import { InventoryTable } from "@/components/inventory-table";
+import type { SkillFile } from "@/lib/types";
+import type { ScanResponse, ScanErrorResponse } from "@/app/api/scan/route";
+
+type ScanState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ok"; skills: SkillFile[]; scannedAt: string; durationMs: number };
 
 export default function Home() {
+  const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
+
+  React.useEffect(() => {
+    async function runScan() {
+      try {
+        const res = await fetch("/api/scan");
+        if (!res.ok) {
+          const errBody = (await res.json()) as ScanErrorResponse;
+          setScan({ status: "error", message: errBody.error });
+          return;
+        }
+        const data = (await res.json()) as ScanResponse;
+        // Flatten all skills from all levels
+        const allSkills: SkillFile[] = [
+          ...data.projects.flatMap((p) => p.skills),
+          ...data.userSkills,
+          ...data.pluginSkills,
+        ];
+        setScan({
+          status: "ok",
+          skills: allSkills,
+          scannedAt: data.scannedAt,
+          durationMs: data.scanDurationMs,
+        });
+      } catch (err) {
+        setScan({
+          status: "error",
+          message: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    }
+
+    void runScan();
+  }, []);
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center min-h-screen bg-background px-4">
-      <main className="flex flex-col items-center gap-6 text-center max-w-lg">
-        <h1 className="text-4xl font-bold tracking-tight">Skill Lens</h1>
-        <p className="text-lg text-muted-foreground">
-          Visualize and analyze Claude Code skills across all your projects.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Skill inventory, overlap detection, and gap analysis — coming soon.
-        </p>
-        <Button disabled>Scan Projects</Button>
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border px-6 py-4 shrink-0">
+        <div className="max-w-7xl mx-auto flex items-baseline gap-3">
+          <h1 className="text-xl font-bold tracking-tight">Skill Lens</h1>
+          <span className="text-sm text-muted-foreground">
+            Claude Code skill inventory
+          </span>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1 px-6 py-6">
+        <div className="max-w-7xl mx-auto flex flex-col gap-4">
+          {scan.status === "loading" && (
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
+              <div className="size-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <p className="text-sm">Scanning projects…</p>
+            </div>
+          )}
+
+          {scan.status === "error" && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+              <strong>Scan failed:</strong> {scan.message}
+            </div>
+          )}
+
+          {scan.status === "ok" && (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Scanned {scan.skills.length} file
+                  {scan.skills.length !== 1 ? "s" : ""} in{" "}
+                  {scan.durationMs}ms
+                </p>
+                <p className="text-xs text-muted-foreground/60">
+                  {new Date(scan.scannedAt).toLocaleTimeString()}
+                </p>
+              </div>
+
+              {scan.skills.length === 0 ? (
+                <div className="rounded-xl border border-border bg-muted/20 px-5 py-10 text-center text-sm text-muted-foreground">
+                  No skill files found. Add some skills to{" "}
+                  <code className="font-mono text-xs">~/.claude/skills/</code>{" "}
+                  or a project&apos;s{" "}
+                  <code className="font-mono text-xs">.claude/skills/</code>{" "}
+                  directory.
+                </div>
+              ) : (
+                <InventoryTable skills={scan.skills} />
+              )}
+            </>
+          )}
+        </div>
       </main>
     </div>
   );

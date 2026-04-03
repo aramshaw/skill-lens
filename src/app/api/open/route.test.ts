@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ExecException } from 'child_process';
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
@@ -22,7 +23,10 @@ import { discoverProjects } from '@/lib/scanner/discover';
 import { POST } from './route';
 import type { Project } from '@/lib/types';
 
-const mockExec = vi.mocked(exec);
+type ExecCallback = (error: ExecException | null, stdout: string, stderr: string) => void;
+type ExecMock = (cmd: string, cb: ExecCallback) => ReturnType<typeof exec>;
+
+const mockExec = vi.mocked(exec) as unknown as { mockImplementation: (fn: ExecMock) => void; mock: { calls: unknown[][] } };
 const mockDiscoverProjects = vi.mocked(discoverProjects);
 
 function makeProject(name: string, projectPath: string): Project {
@@ -32,8 +36,8 @@ function makeProject(name: string, projectPath: string): Project {
 beforeEach(() => {
   vi.resetAllMocks();
   // Simulate exec succeeding
-  mockExec.mockImplementation((_cmd: string, cb: (err: Error | null) => void) => {
-    cb(null);
+  mockExec.mockImplementation((_cmd: string, cb: ExecCallback) => {
+    cb(null, '', '');
     return {} as ReturnType<typeof exec>;
   });
   mockDiscoverProjects.mockResolvedValue([
@@ -118,8 +122,8 @@ describe('POST /api/open — exec invocation', () => {
   });
 
   it('returns 500 when exec returns an error', async () => {
-    mockExec.mockImplementation((_cmd: string, cb: (err: Error | null) => void) => {
-      cb(new Error('exec failed'));
+    mockExec.mockImplementation((_cmd: string, cb: ExecCallback) => {
+      cb(Object.assign(new Error('exec failed'), { code: 1, killed: false, cmd: '' }) as ExecException, '', '');
       return {} as ReturnType<typeof exec>;
     });
     const response = await postOpen({
