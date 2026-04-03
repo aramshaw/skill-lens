@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
-import { CopyIcon, CheckIcon, ExternalLinkIcon } from "lucide-react";
+import { CopyIcon, CheckIcon, ExternalLinkIcon, LayersIcon } from "lucide-react";
 import type { SkillFile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -13,6 +14,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { skillIdentityKey } from "@/lib/analyzer/overlaps";
+import { buildOverlapsUrl } from "@/lib/cross-page-nav";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +24,12 @@ import {
 interface SkillDetailPanelProps {
   skill: SkillFile | null;
   onClose: () => void;
+  /**
+   * Set of skill identity keys (e.g. "code-review/SKILL.md") that have overlap
+   * clusters. When the open skill's identity is in this set, a "View overlaps"
+   * link is shown in the detail panel.
+   */
+  overlapIdentities?: Set<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +222,7 @@ function OpenInEditorButton({ filePath }: { filePath: string }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export function SkillDetailPanel({ skill, onClose }: SkillDetailPanelProps) {
+export function SkillDetailPanel({ skill, onClose, overlapIdentities }: SkillDetailPanelProps) {
   const isOpen = skill !== null;
 
   // Handle Escape key — base-ui Dialog already handles Escape natively,
@@ -278,6 +287,23 @@ export function SkillDetailPanel({ skill, onClose }: SkillDetailPanelProps) {
                 <CopyButton text={skill.filePath} />
                 <OpenInEditorButton filePath={skill.filePath} />
               </div>
+
+              {/* View overlaps link — only shown when this skill has overlap clusters */}
+              {(() => {
+                const identity = skillIdentityKey(skill.filePath);
+                if (!overlapIdentities?.has(identity)) return null;
+                return (
+                  <Link
+                    href={buildOverlapsUrl(identity)}
+                    onClick={onClose}
+                    className="inline-flex items-center gap-1.5 self-start rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                    data-testid="view-overlaps-link"
+                  >
+                    <LayersIcon className="size-3.5" />
+                    View overlaps
+                  </Link>
+                );
+              })()}
 
               {/* Frontmatter */}
               <section>

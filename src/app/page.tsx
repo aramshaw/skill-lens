@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { InventoryTable } from "@/components/inventory-table";
 import { ProjectSidebar } from "@/components/project-sidebar";
 import { ClaudeMdViewer } from "@/components/claude-md-viewer";
 import { SettingsPanel, loadAdditionalPaths } from "@/components/settings-panel";
 import { useScanContext } from "@/components/scan-context";
+import { parseSearchParam } from "@/lib/cross-page-nav";
 import type { ProjectFilter } from "@/components/project-sidebar";
 import type { SkillFile } from "@/lib/types";
 import type { ScanResponse, ScanErrorResponse } from "@/app/api/scan/route";
@@ -29,6 +31,8 @@ interface DashboardStats {
   overlaps: number;
   gaps: number;
   contradictions: number;
+  /** Skill identity keys that have at least one overlap cluster. */
+  overlapIdentities: Set<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +64,8 @@ function StatCard({ label, value, href, colorClass }: StatCardProps) {
 
 export default function Home() {
   const { registerScan } = useScanContext();
+  const searchParams = useSearchParams();
+  const initialSearch = parseSearchParam(searchParams.get("search"));
   const [scan, setScan] = React.useState<ScanState>({ status: "loading" });
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
   const [projectFilter, setProjectFilter] = React.useState<ProjectFilter>(null);
@@ -134,6 +140,7 @@ export default function Home() {
           overlaps: analyzeData.clusters.length,
           gaps: analyzeData.gaps.length,
           contradictions: analyzeData.contradictions.length,
+          overlapIdentities: new Set(analyzeData.clusters.map((c) => c.skillIdentity)),
         });
       }
 
@@ -262,6 +269,8 @@ export default function Home() {
                     <InventoryTable
                       skills={scan.skills}
                       projectFilter={projectFilter}
+                      initialSearch={initialSearch}
+                      overlapIdentities={stats?.overlapIdentities}
                     />
                     {/* CLAUDE.md viewer — shown when a specific project is selected */}
                     {projectFilter !== null &&

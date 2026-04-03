@@ -18,6 +18,17 @@ interface InventoryTableProps {
    * - any other string — show only skills from that project
    */
   projectFilter?: string | null;
+  /**
+   * Initial search query to pre-populate the search box on mount.
+   * Used when navigating from another page (e.g. from Insights or Overlaps).
+   * Only applied once — the user can clear/change it freely after mount.
+   */
+  initialSearch?: string;
+  /**
+   * Set of skill identity keys that have overlap clusters.
+   * Passed through to SkillDetailPanel to conditionally show the "View overlaps" link.
+   */
+  overlapIdentities?: Set<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,8 +206,8 @@ function PaginationButton({
 // Component
 // ---------------------------------------------------------------------------
 
-export function InventoryTable({ skills, projectFilter }: InventoryTableProps) {
-  const [search, setSearch] = React.useState("");
+export function InventoryTable({ skills, projectFilter, initialSearch = "", overlapIdentities }: InventoryTableProps) {
+  const [search, setSearch] = React.useState(initialSearch);
   const [typeFilter, setTypeFilter] = React.useState<string>("all");
   const [levelFilter, setLevelFilter] = React.useState<string>("all");
   const [sort, setSort] = React.useState<ActiveSort>({ key: "default" });
@@ -454,6 +465,7 @@ export function InventoryTable({ skills, projectFilter }: InventoryTableProps) {
       <SkillDetailPanel
         skill={selected}
         onClose={() => setSelected(null)}
+        overlapIdentities={overlapIdentities}
       />
     </div>
   );
