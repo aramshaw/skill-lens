@@ -205,8 +205,8 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Paths are saved to your browser. Use the Re-scan button in the
-              nav bar to apply changes.
+              Paths are saved to your browser and take effect immediately
+              &mdash; the skill list will re-scan automatically.
             </p>
           </section>
         </div>
