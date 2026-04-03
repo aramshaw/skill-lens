@@ -1,26 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { loadAdditionalPaths } from "@/components/settings-panel";
 import { Button } from "@/components/ui/button";
 import type {
   ValidatePathResponse,
   ValidatePathErrorResponse,
 } from "@/app/api/validate-path/route";
-
-// ---------------------------------------------------------------------------
-// Storage helpers (duplicated from settings-panel to avoid Sheet dependency)
-// ---------------------------------------------------------------------------
-
-const STORAGE_KEY = "skill-lens:additionalPaths";
-
-function saveAdditionalPaths(paths: string[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(paths));
-  } catch {
-    // Ignore storage errors
-  }
-}
+import { loadAdditionalPaths, saveAdditionalPaths } from "@/lib/storage";
 
 // ---------------------------------------------------------------------------
 // Types
