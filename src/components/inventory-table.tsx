@@ -230,7 +230,9 @@ export function InventoryTable({ skills, projectFilter, initialSearch = "", over
       } else if (projectFilter === "__plugin__") {
         result = result.filter((s) => s.level === "plugin");
       } else {
-        result = result.filter((s) => s.projectName === projectFilter);
+        // Include both project-level skills for this project AND user-level skills
+        // (user-level skills are active in every project)
+        result = result.filter((s) => s.projectName === projectFilter || s.level === "user");
       }
     }
 
