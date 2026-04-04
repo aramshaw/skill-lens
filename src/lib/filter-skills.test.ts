@@ -50,15 +50,22 @@ describe('filterSkillsByProject', () => {
     expect(result[0].level).toBe('plugin');
   });
 
-  it('returns only skills from named project', () => {
+  it('returns project-level AND user-level skills for a named project', () => {
     const result = filterSkillsByProject(allSkills, 'app-a');
-    expect(result).toHaveLength(1);
-    expect(result[0].projectName).toBe('app-a');
+    expect(result).toHaveLength(2);
+    expect(result.some((s) => s.projectName === 'app-a')).toBe(true);
+    expect(result.some((s) => s.level === 'user')).toBe(true);
   });
 
-  it('returns empty array when no skills match the named project', () => {
+  it('returns only user-level skills when no project-level skills match', () => {
     const result = filterSkillsByProject(allSkills, 'nonexistent');
-    expect(result).toHaveLength(0);
+    expect(result).toHaveLength(1);
+    expect(result[0].level).toBe('user');
+  });
+
+  it('does not include plugin-level skills when filtering by project', () => {
+    const result = filterSkillsByProject(allSkills, 'app-a');
+    expect(result.every((s) => s.level !== 'plugin')).toBe(true);
   });
 
   it('does not mutate the original array', () => {

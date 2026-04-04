@@ -18,5 +18,7 @@ export function filterSkillsByProject(
   if (filter === null) return skills;
   if (filter === "__user__") return skills.filter((s) => s.level === "user");
   if (filter === "__plugin__") return skills.filter((s) => s.level === "plugin");
-  return skills.filter((s) => s.projectName === filter);
+  // Include both project-level skills for this project AND user-level skills
+  // (user-level skills are active in every project)
+  return skills.filter((s) => s.projectName === filter || s.level === "user");
 }
