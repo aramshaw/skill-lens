@@ -41,3 +41,23 @@ Local web app for visualizing and analyzing Claude Code skills across all projec
 npm run dev    # development server on :3000
 npm run build  # production build
 ```
+
+## Fleet upgrade pending (added 2026-10-05)
+
+Adam's coordinator, PM and agent skills were consolidated into one personal-level master
+(`~/.claude/skills/issue-coordinator/`; called `issue-coordinator-next` before go-live). This project is
+on hold, so it was deliberately left on its old local copies: `.claude/skills/issue-coordinator-next-ts`,
+`.claude/agents/implement-issue-next-ts` and `verify-issue-next-ts` (local only, not committed).
+
+**Their names differ from the master's, so the master does not replace them: `/issue-coordinator-next-ts`
+would still run the old copy.** Don't use them. Before any coordinator, PM or agent work here, stop and
+tell Adam the upgrade is due, then do it with him:
+
+1. Add a `## Coordinator config` section to this file. Template: `reference/config-template.md` in the
+   master skill. Expect `trunk: main`; for `stack`, use `nextjs-supabase` (ignore its Supabase parts)
+   or add a plain `nextjs` stack file to the master first.
+2. Fix the preconditions the master checks: there is no CI and no gate command yet. Add a `check`
+   script (tsc, lint, tests) and a CI workflow that runs it.
+3. Validate with `python ~/.claude/skills/issue-coordinator/scripts/read_config.py`, then run
+   `/issue-coordinator --dry-run`.
+4. Delete the three local `-next-ts` folders, then this section.
